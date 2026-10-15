@@ -59,6 +59,17 @@ function Car({ weather, onReady }) {
       else if (/^rim_|^wheel(?:_\d+)?$/.test(mesh.name)) mesh.material = wheelMaterial
       else {
         mesh.material = mesh.material.clone()
+        if (/metal_gray|metal_chrome/i.test(mesh.material.name)) {
+          mesh.material.color.set('#626b70')
+          mesh.material.metalness = .94
+          mesh.material.roughness = .4
+          mesh.material.envMapIntensity = .65
+        }
+        if (/carbon/i.test(mesh.material.name)) {
+          mesh.material.color.set('#10161a')
+          mesh.material.metalness = .3
+          mesh.material.roughness = .4
+        }
         if (/tire/i.test(mesh.material.name)) {
           mesh.material.color.set('#101112')
           mesh.material.roughness = 0.9
@@ -232,11 +243,12 @@ function Director({ progress, reducedMotion, weather }) {
   useFrame((_, dt) => {
     smoothed.current = reducedMotion ? progress.current : damp(smoothed.current, progress.current, 4, Math.min(dt, 0.25))
     const p = smoothed.current
-    const shot = shotAt(p, size.width / size.height)
+    const shot = shotAt(p)
     weather.current = rainfallAt(p)
     camera.position.fromArray(shot.position)
     camera.lookAt(target.fromArray(shot.target))
-    camera.fov = shot.fov
+    camera.rotateZ(shot.roll)
+    camera.fov = 360/Math.PI * Math.atan(Math.tan(shot.fov*Math.PI/360)/(size.width/size.height))
     camera.updateProjectionMatrix()
   }, -1)
   return null

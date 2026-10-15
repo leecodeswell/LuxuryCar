@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.js',
   outputDir: '/tmp/aurel-test-results',
   timeout: 180_000,
   expect: { timeout: 30_000 },

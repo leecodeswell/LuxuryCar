@@ -1,5 +1,7 @@
-import { Component, useCallback, useEffect, useRef, useState } from 'react'
-import Scene from './Scene.jsx'
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import CinematicFilm from './CinematicFilm.jsx'
+import Atmosphere from './Atmosphere.jsx'
+const Scene = lazy(() => import('./Scene.jsx'))
 
 class RenderBoundary extends Component {
   state = { error: false }
@@ -16,10 +18,12 @@ class RenderBoundary extends Component {
 
 export default function App() {
   const [ready, setReady] = useState(false)
+  const [fallback, setFallback] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const progress = useRef(0)
   const markReady = useCallback(() => setReady(true), [])
+  const useFallback = useCallback(() => { setReady(false); setFallback(true) }, [])
   const contextLost = useCallback(event => { event.preventDefault(); setUnavailable(true) }, [])
 
   useEffect(() => {
@@ -42,12 +46,14 @@ export default function App() {
 
   return <>
     <div className="scroll-space" aria-hidden="true" />
-    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="Scroll-driven cinematic study of a Ferrari 458: overview, side tracking shot, rear view, then rain and a rear-to-front side tracking shot.">
+    <main data-renderer={fallback ? 'webgl' : 'cycles-film'} className={`experience ${ready ? 'is-ready' : ''}`} aria-label="Scroll-driven cinematic study of a Ferrari 458: descending front-quarter flight, rising offset rear sweep, then rain and a swooping return toward the front.">
       <div className="stage">
         <RenderBoundary onError={markReady}>
-          <Scene progress={progress} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} />
+          {fallback ? <Suspense fallback={null}><Scene progress={progress} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} /></Suspense>
+            : <CinematicFilm progress={progress} reducedMotion={reducedMotion} onReady={markReady} onError={useFallback} />}
         </RenderBoundary>
       </div>
+      {!fallback && <Atmosphere progress={progress} reducedMotion={reducedMotion} />}
       <div className="cinematic-grade" aria-hidden="true" />
       <div className={`loading-screen ${ready ? 'loaded' : ''}`} aria-hidden="true" />
       {unavailable && <div className="render-error" role="alert">The graphics connection was interrupted. Reload to return to the studio.</div>}

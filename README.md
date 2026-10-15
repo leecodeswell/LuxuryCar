@@ -1,56 +1,67 @@
-# AUREL — An automotive study
+# AUREL — Cinematic automotive study
 
-A full-screen, real-time 3D Ferrari experience built with React, Three.js, and React Three Fiber. A text-free, scroll-driven film: offset overview, dry side tracking pass, rear view, rainfall, and a wet rear-to-front side tracking pass.
+A text-free, scroll-driven car film with descending front-quarter shots, a high offset rear sweep, rain, and a swooping return to the front. Mouse movement and dragging do not steer the camera.
+
+The primary film is **offline path-traced in Blender Cycles**, with guided denoising, AgX color, and compressed frame scrubbing in the browser. It does **not** perform live browser ray tracing. Foreground rain/mist stays animated at rest. A lazy-loaded Three.js scene supplies a live rasterized fallback when media cannot load.
 
 ## Develop
 
-Use the existing checkout at `/workspace/LuxuryCar`. Cloud tasks are already isolated; no additional worktree is necessary.
+Use the existing checkout. Cloud tasks are already isolated; do not create another worktree unless requested. In GitHub Codespaces, open the repository folder and use its terminal.
 
-Requires Node.js 22.12+ (validated with Node 24) and npm. No API keys, backend, database, or external runtime asset requests are needed.
+Requires Node.js 22.12+ (validated with Node 24).
 
 ```bash
 npm ci --include=dev --cache /tmp/luxurycar-npm-cache --no-audit --no-fund
 npm run dev -- --port 3000
 ```
 
-Run these commands from the repository root (already open in GitHub Codespaces). Including development dependencies ensures Vite is installed even when NODE_ENV is production. The temporary npm cache keeps installation compatible with the cloud filesystem's writable directories. Leave the development server running during interactive work.
+Including development dependencies ensures Vite is installed even if `NODE_ENV=production`. Keep the terminal running and open port 3000 through the Codespaces **Ports** tab. No credentials, backend, database, or external runtime asset requests are needed.
 
 ```bash
 npm run build
-npm run preview -- --port 3000
-```
-
-`dist/` is the production output. It can be hosted as a static site. All URLs assume deployment at the origin root.
-
-## Browser validation
-
-```bash
+npm run preview -- --port 4173
+npm run test:camera
 npm run test:smoke
 ```
 
-The two Playwright checks use system Chromium when available, or Playwright's Chromium otherwise (`npx playwright install chromium` on machines without a browser). They exercise actual WebGL model rendering, the ordered camera sequence, fixed side-on optical axes, delayed rain, wet surfaces, absence of text and free-look controls, and mobile framing. The runner starts Vite if needed. Screenshots and test outputs go to `/tmp/aurel-*` rather than the checkout. Software rendering makes the browser checks slower than interaction on a hardware-accelerated device.
+`dist/` is the static production output. URLs assume hosting at the origin root. Pre-rendered media is checked in; normal development and builds do not need Blender or rerender the film.
 
-## Experience
+## Rendering and research
 
-Scroll down to play the sequence; scroll back to reverse it. There are no visible titles, navigation, controls, paint selectors, or audio. Mouse movement and dragging do not change the camera.
+Read [the research and implementation decision](docs/visual-research.md) for primary sources from Lusion, Active Theory, Utsubo, and the Three.js path-tracing project. Live studio sites were blocked by the cloud network; the original Lumette reel was not inspected, and its technology is not asserted.
 
-1. Centered offset overview of the car in a dark studio.
-2. A straight side-on pass from front to rear.
-3. Rear view, held as the rain starts.
-4. A closer side-on pass from rear to front with wet paint and water droplets.
+- `src/camera-path.json`: shared camera position, aim, lens, banking, and rain timing.
+- `src/CinematicFilm.jsx`: compressed-buffer loading, bounded forward/backward seeking, and reduced-motion handling. Loading the selected compressed file into a Blob enables random seeking on hosts without HTTP range support.
+- `src/Atmosphere.jsx`: lightweight foreground compositing, clipped to the film frame.
+- `src/Scene.jsx`: optional live WebGL fallback using the same drone path.
+- `scripts/render_film.py`: Cycles scene, physical materials and refractive water geometry.
+- `scripts/grade_frame.py`: normal/albedo-guided denoising, AgX, depth haze, and restrained bloom.
+- `public/cinema/manifest.json`: actual source size, samples, renderer, and interpolation details.
 
-The side passes move the camera and its target together along the vehicle's longitudinal axis. Camera height, distance, lens, and orientation remain constant during each pass. Mobile framing dollies out along the same optical axis. Reduced-motion preferences remove scroll smoothing.
+The shipped film is a 1280×720 preview made using the free source model and this CPU environment. Camera transitions use continuous Hermite curves; there is no flat rear hold. H.264/VP9 playback is interpolated for smoother scrubbing. This does not restore detail absent from the original demo model. The film keeps its full frame on portrait screens instead of cropping the car.
 
-## Scene implementation
+## Optional film regeneration
 
-`src/cinematography.js` defines the shot sequence and rain cue. `src/Scene.jsx` contains physically based materials, local studio HDR lighting, planar floor reflection, refractive surface droplets, procedural wet-paint normals, and rain. `src/App.jsx` only connects scroll position and loading/error state to the scene.
+This is a separate, expensive content-authoring step. It is **not** part of npm install, development startup, or production build. Requires Blender 4.3+, FFmpeg with H.264/VP9 encoders, and Python 3.12+. The saved Blender scene and source frames remain in the ignored `.cinema-cache/` directory.
 
-The current vehicle is a real-time mesh. Production-grade macro shots would benefit from a higher-resolution vehicle asset; replacing it also requires checking material names, scale, camera framing, and surface sampling.
+```bash
+npm run cinema:prepare
+python3 -m venv .cinema-cache/venv
+.cinema-cache/venv/bin/python -m pip install --cache-dir /tmp/luxurycar-pip-cache -r scripts/requirements-render.txt
+python3 scripts/setup_oidn.py
+.cinema-cache/venv/bin/python scripts/bake_cinema.py --oidn .cinema-cache/tools/oidn-2.5.1.x86_64.linux/bin/oidnDenoise
+```
 
-## Asset credits
+The OIDN helper verifies the pinned official release checksum before extracting it. The default OpenColorIO config path matches this machine's Blender installation; use `--ocio /path/to/blender/datafiles/colormanagement/config.ocio` elsewhere. `--samples` and `--threads` control quality and CPU use. The source script currently selects CPU rendering; a suitable local GPU and Blender device configuration would allow higher-resolution/high-sample renders without paying for a render service.
 
-- Ferrari 458 Italia model: **vicent091036**, credited by the [Three.js car example](https://github.com/mrdoob/three.js/blob/dev/examples/webgl_materials_car.html). [Original model](https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6). The GLB and ambient-occlusion image are retained locally from that example. Vehicle geometry was retained; paint, glass, rims, lighting, and weather have been adapted.
-- Studio Small 03 HDRI: **Greg Zaal / Poly Haven**, [CC0](https://polyhaven.com/a/studio_small_03), distributed through [drei-assets](https://github.com/pmndrs/drei-assets).
-- Draco decoder: **Google**, Apache 2.0. Three.js: MIT. Notices are in `public/licenses/`.
+The bake resumes existing matching frames. It refuses to silently mix changed render settings with an old cache. Preserve or remove the generated numeric PNG/EXR files and `render-info.json` when intentionally changing the source scene, grading, or timeline. Do not remove the original source GLB. See `.cinema-cache/render.log` and the bake's frame counts for diagnostics.
 
-AUREL is a fictional independent creative concept and has no affiliation with Ferrari S.p.A. Vehicle names, marks, and design belong to their respective owners.
+## Validation
+
+The camera unit tests verify smooth derivatives, clearance from the car/floor, high offset rear framing, and the rain cue. Browser tests verify actual decoded frame changes, forward/reverse seeking, silent paused playback, no visible interface, mobile framing, and fallback WebGL rendering. Browser tests use system Chromium when available; otherwise install Playwright Chromium. Test artifacts are written to `/tmp/aurel-*`.
+
+## Credits
+
+[Asset and rendering credits](public/cinema/credits.txt) are served at `/cinema/credits.txt`. The Ferrari model is credited to **vicent091036**, via the [Three.js car materials example](https://github.com/mrdoob/three.js/blob/dev/examples/webgl_materials_car.html). The fallback HDRI is **Studio Small 03, Greg Zaal / Poly Haven**, CC0. Software notices are in `public/licenses/`.
+
+AUREL is an independent concept and has no affiliation with Ferrari S.p.A. No paid or noncommercial-only replacement car asset was added.

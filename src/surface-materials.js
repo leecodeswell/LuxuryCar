@@ -104,6 +104,8 @@ export function applySurface(material, uniforms, {foam=true}={}) {
       clearcoatNormal=surfaceBump(clearcoatNormal,surfaceRelief*(1.-foamCoverage()),-vViewPosition);
       #endif`)
     if(foam) {
+      shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+        totalEmissiveRadiance*=1.-foamCoverage();`)
       shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
         float latherCoverage=foamCoverage();
         float poreTone=uFoam>.001?foamPores(surfaceUV(vSurfacePosition)*340.):1.;

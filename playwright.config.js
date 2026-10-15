@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.js',
   outputDir: '/tmp/aurel-test-results',
   timeout: 180_000,
   expect: { timeout: 30_000 },
@@ -10,7 +11,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:3000',
-    viewport: { width: 1200, height: 820 },
+    viewport: { width: 1100, height: 700 },
     reducedMotion: 'reduce',
     launchOptions: {
       ...(existsSync('/usr/bin/chromium') ? { executablePath: '/usr/bin/chromium' } : {}),

@@ -42,7 +42,7 @@ export default function App() {
 
   return <>
     <div className="scroll-space" aria-hidden="true" />
-    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="Scroll-driven cinematic study of a Ferrari 458: overview, side tracking shot, rear view, then rain and a rear-to-front side tracking shot.">
+    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="Three live 3D automotive sequences: a hexagon-lit studio with rain, extreme sunlight in a mineral courtyard, and a dark wash chamber with soap foam.">
       <div className="stage">
         <RenderBoundary onError={markReady}>
           <Scene progress={progress} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} />

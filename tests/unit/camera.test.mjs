@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {CHAPTERS,SHOTS,chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,cameraDriftAt} from '../../src/cinematography.js'
+import {CHAPTERS,SHOTS,chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,cameraDriftAt} from '../../src/cinematography.js'
 import {LIGHT_CUES,lightingAt,createLightingDirector,advanceLighting} from '../../src/lighting.js'
 const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]))
 
@@ -53,15 +53,17 @@ test('idle camera translation is subtle, continuous, and keeps moving',()=>{
   }
 })
 test('rain joins soap with matching camera position, aim, lens, and global velocity',()=>{
-  assert.deepEqual(CHAPTERS.map(c=>c.id),['studio','foam'])
+  assert.deepEqual(CHAPTERS.map(c=>c.id),['studio','foam','rinse'])
   const h=1e-6
   const at=p=>{const c=chapterAt(p);return shotAt(c.local,16/9,c.shots)}
-  const a=at(.6-h),b=at(.6),c=at(.6+h)
+  for(const join of [.6,.82]){
+  const a=at(join-h),b=at(join),c=at(join+h)
   for(const key of ['position','target'])for(let i=0;i<3;i++){
     assert(Math.abs(a[key][i]-c[key][i])<.001)
     assert(Math.abs((b[key][i]-a[key][i])/h-(c[key][i]-b[key][i])/h)<.03)
   }
-  assert(Math.abs(a.fov-c.fov)<.001);assert.equal(chapterAt(1).id,'foam')
+  assert(Math.abs(a.fov-c.fov)<.001);}
+  assert.equal(chapterAt(1).id,'rinse')
 })
 test('soap is progressively applied and stays on through the end',()=>{
   assert.equal(foamAt(0),0);assert.equal(sprayAt(0),0)
@@ -92,5 +94,18 @@ test('lighting triggers once per authored crossing, completes while idle, and re
 test('rain curtain fades smoothly into the soap opening without drying the persistent mist',()=>{
   assert.equal(precipitationAt(.6),1);assert.equal(precipitationAt(.67),0)
   assert(Math.abs(precipitationAt(.6-1e-5)-precipitationAt(.6+1e-5))<1e-5)
-  assert(precipitationAt(.62)>precipitationAt(.64));assert(precipitationAt(.64)>0)
+  assert(precipitationAt(.61)>precipitationAt(.62));assert(precipitationAt(.62)>0)
+})
+
+test('rinse clears progressively, only while pressure spray is active, and finishes wet',()=>{
+  assert.equal(rinseAt(0),0);assert.equal(rinseSprayAt(0),0)
+  let last=0
+  for(let i=0;i<=100;i++){
+    const p=i/100,next=rinseAt(p)
+    assert(next>=last)
+    if(next>last)assert(rinseSprayAt(p)>.9)
+    last=next
+  }
+  assert.equal(rinseAt(1),1);assert.equal(rinseSprayAt(1),0)
+  assert.equal(precipitationAt(.9),0)
 })

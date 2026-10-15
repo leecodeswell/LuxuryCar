@@ -4,10 +4,37 @@ export function seededRandom(seed=458) {
   return () => {seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
 }
 
+// Shared by paint displacement and geometric froth so the same exposed patches
+// and pressure-wash front remain attached to the body across all three passes.
+export const latherGLSL = `
+  uniform float uFoam,uRinse;
+  float latherHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float latherNoise(vec2 p){
+    vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+    return mix(mix(latherHash(i),latherHash(i+vec2(1,0)),f.x),
+      mix(latherHash(i+vec2(0,1)),latherHash(i+1.),f.x),f.y);
+  }
+  float latherMask(vec3 p) {
+    vec2 uv=vec2(p.x+p.z*.43,p.y+p.z*.31);
+    float warp=latherNoise(uv*4.1+vec2(3.7,8.2));
+    float patchiness=latherNoise(uv*6.3+warp*.85)*.72+latherNoise(uv*17.9)*.28;
+    float streak=(latherNoise(vec2((p.x+p.z*.61)*48.,p.y*2.4))-.5)*.14;
+    float coverage=smoothstep(.38,.65,patchiness+streak+smoothstep(.7,1.25,p.y)*.08);
+    float depositFront=mix(-2.7,2.9,uFoam);
+    float deposit=(1.-smoothstep(depositFront-.24,depositFront+.24,p.z))*smoothstep(0.,.06,uFoam);
+    // Rinse moves rear to front, independently of the front-to-rear deposition.
+    float washFront=mix(3.2,-3.2,uRinse);
+    float unevenEdge=.1*sin(p.x*14.+p.y*11.)+.045*sin(p.z*31.);
+    float remaining=1.-smoothstep(washFront-.22,washFront+.22,p.z+unevenEdge);
+    return coverage*deposit*remaining;
+  }
+`
+
 // Shared world-space surface detail: wet paint, gravity rivulets, and foam pores.
 // No UV assumption and no per-frame geometry rebuilds.
 const surfaceGLSL = `
-  uniform float uWet, uFoam, uSurfaceTime;
+  uniform float uWet, uSurfaceTime;
+  ${latherGLSL}
   varying vec3 vSurfacePosition, vSurfaceNormal;
   float hash21(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
   float noise21(vec2 p) {
@@ -37,20 +64,14 @@ const surfaceGLSL = `
   }
   float foamCoverage() {
     if(uFoam<.001)return 0.;
-    vec3 p=vSurfacePosition;
-    float pooled=noise21(surfaceUV(p)*5.5);
-    float runnel=noise21(vec2((p.x+p.z*.6)*37.,p.y*1.8+uSurfaceTime*.025));
-    float vertical=1.-abs(normalize(vSurfaceNormal).y);
-    float coverage=mix(.96,1.,pooled);
-    float front=mix(-2.7,2.9,uFoam);
-    float deposit=1.-smoothstep(front-.24,front+.24,p.z+(pooled-.5)*.18);
-    return coverage*deposit*smoothstep(0.,.06,uFoam);
+    return latherMask(vSurfacePosition);
   }
+
   float surfaceHeight() {
     if(uWet<.001 && uFoam<.001)return 0.;
     vec3 p=vSurfacePosition,n=abs(normalize(vSurfaceNormal));
     vec2 uv=n.y>.65?p.xz:n.x>.55?p.zy:p.xy;
-    float beads=uWet>.001?(beadHeight(uv*145.)*.00017+pow(noise21(uv*470.),10.)*.00008)*uWet*(1.-uFoam):0.;
+    float beads=uWet>.001?(beadHeight(uv*145.)*.00017+pow(noise21(uv*470.),10.)*.00008)*uWet*(1.-foamCoverage()):0.;
     float trails=pow(noise21(vec2((p.x+p.z*.7)*90.,p.y*3.+uSurfaceTime*.16)),16.)*.0003*uWet*(1.-n.y);
     float lather=uFoam>.001?(foamPores(surfaceUV(p)*260.)*.0016+noise21(surfaceUV(p)*38.)*.0028)*foamCoverage():0.;
     return beads+trails+lather;
@@ -66,22 +87,21 @@ const surfaceGLSL = `
 export function applySurface(material, uniforms, {foam=true}={}) {
   material.onBeforeCompile=shader=>{
     Object.assign(shader.uniforms,uniforms)
-    shader.vertexShader='uniform float uFoam;varying vec3 vSurfacePosition, vSurfaceNormal;\n'+shader.vertexShader
+    shader.vertexShader=latherGLSL+'varying vec3 vSurfacePosition, vSurfaceNormal;\n'+shader.vertexShader
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
       vec3 coatWorld=(modelMatrix*vec4(transformed,1.)).xyz;
-      float coatFront=mix(-2.7,2.9,uFoam);
-      float coatDeposit=(1.-smoothstep(coatFront-.24,coatFront+.24,coatWorld.z))*smoothstep(0.,.06,uFoam);
-      float thickness=.018+.004*sin(coatWorld.x*39.+coatWorld.z*33.)*sin(coatWorld.y*41.-coatWorld.z*27.);
+      float coatDeposit=${foam?'latherMask(coatWorld)':'0.'};
+      float thickness=.004+.003*sin(coatWorld.x*39.+coatWorld.z*33.)*sin(coatWorld.y*41.-coatWorld.z*27.);
       transformed+=normal*thickness*coatDeposit;
       vSurfacePosition=(modelMatrix*vec4(transformed,1.)).xyz;
       vSurfaceNormal=normalize(mat3(modelMatrix)*normal);`)
-    shader.fragmentShader=surfaceGLSL+shader.fragmentShader
+    shader.fragmentShader=(foam?surfaceGLSL:surfaceGLSL.replace('return latherMask(vSurfacePosition);','return 0.;'))+shader.fragmentShader
     shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
       float surfaceRelief=surfaceHeight();
       normal=surfaceBump(normal,surfaceRelief,-vViewPosition);`)
     shader.fragmentShader=shader.fragmentShader.replace('#include <clearcoat_normal_fragment_maps>',`#include <clearcoat_normal_fragment_maps>
       #ifdef USE_CLEARCOAT
-      clearcoatNormal=surfaceBump(clearcoatNormal,surfaceRelief*(1.-uFoam),-vViewPosition);
+      clearcoatNormal=surfaceBump(clearcoatNormal,surfaceRelief*(1.-foamCoverage()),-vViewPosition);
       #endif`)
     if(foam) {
       shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>

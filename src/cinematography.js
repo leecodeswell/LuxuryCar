@@ -17,13 +17,21 @@ export const FOAM_SHOTS = [
   { p:.70, position:[4.8,4,5], target:[0,.65,.5], fov:40, roll:.025 },
   { p:1, position:[6.8,3.1,-6.7], target:[0,.65,0], fov:38, roll:0 },
 ]
+export const RINSE_SHOTS = [
+  {...FOAM_SHOTS.at(-1),p:0},
+  {p:.28,position:[5.4,1.8,-7.4],target:[0,.72,-.6],fov:36,roll:-.012},
+  {p:.58,position:[4.4,1.3,.8],target:[0,.8,.5],fov:35,roll:.008},
+  {p:.8,position:[4.8,2.8,6.8],target:[0,.65,.4],fov:38,roll:.012},
+  {p:1,position:[7.8,3.5,8.5],target:[0,.65,0],fov:36,roll:0},
+]
 export const CHAPTERS = [
   { id:'studio', start:0, end:.6, shots:SHOTS },
-  { id:'foam', start:.6, end:1, shots:FOAM_SHOTS },
+  { id:'foam', start:.6, end:.82, shots:FOAM_SHOTS },
+  { id:'rinse', start:.82, end:1, shots:RINSE_SHOTS },
 ]
 export function chapterAt(progress) {
   const p=Math.min(1,Math.max(0,progress))
-  const index=p<.6?0:1
+  const index=p<.6?0:p<.82?1:2
   const chapter=CHAPTERS[index]
   return { ...chapter, index, local:(p-chapter.start)/(chapter.end-chapter.start) }
 }
@@ -37,9 +45,11 @@ export function shotAt(progress, aspect=16/9, shots=SHOTS) {
     const get=s=>axis===undefined?(s[key]??0):s[key][axis]
     const tangent=i=>{
       // Match the final studio track in GLOBAL scroll space at the uncut join.
-      if(shots===FOAM_SHOTS && i===0){
-        const a=SHOTS.at(-2),b=SHOTS.at(-1)
-        return (get(b)-get(a))/(b.p-a.p)*(.4/.6)
+      const chapterIndex=CHAPTERS.findIndex(c=>c.shots===shots)
+      if(chapterIndex>0 && i===0){
+        const previous=CHAPTERS[chapterIndex-1],current=CHAPTERS[chapterIndex]
+        const a=previous.shots.at(-2),b=previous.shots.at(-1)
+        return (get(b)-get(a))/(b.p-a.p)*(current.end-current.start)/(previous.end-previous.start)
       }
       // Both ends of a side pass share its exact velocity. This preserves the
       // horizontal optical axis and makes its incoming/outgoing connector C1.
@@ -62,6 +72,7 @@ export function rainfallAt(progress) {
 export function precipitationAt(progress) {
   const chapter=chapterAt(progress)
   if(chapter.id==='studio')return rainfallAt(chapter.local)
+  if(chapter.id==='rinse')return 0
   const t=Math.min(1,Math.max(0,chapter.local/.16))
   return 1-t*t*(3-2*t)
 }
@@ -78,4 +89,13 @@ export function sprayAt(progress) {
 // Position and aim move together: this does not introduce orbit or pointer control.
 export function cameraDriftAt(time) {
   return [.045*Math.sin(time*.19),.018*Math.sin(time*.23),.045*(Math.cos(time*.19)-1)]
+}
+
+export function rinseAt(progress) {
+  const t=Math.min(1,Math.max(0,(progress-.08)/.78))
+  return t*t*(3-2*t)
+}
+export function rinseSprayAt(progress) {
+  const smooth=(a,b)=>{const t=Math.min(1,Math.max(0,(progress-a)/(b-a)));return t*t*(3-2*t)}
+  return smooth(.025,.07)*(1-smooth(.85,.94))
 }

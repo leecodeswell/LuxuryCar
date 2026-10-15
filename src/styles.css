@@ -7,7 +7,7 @@
 html { scrollbar-width: none; }
 html::-webkit-scrollbar { display: none; }
 body { margin: 0; }
-.scroll-space { height: 1400svh; }
+.scroll-space { height: 1800svh; }
 .experience {
   position: fixed;
   inset: 0;

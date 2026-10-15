@@ -46,23 +46,3 @@ body { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .loading-screen { transition: none; }
 }
-.cinematic-film {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #05080b;
-  pointer-events: none;
-}
-.experience[data-renderer="cycles-film"] .cinematic-grade {
-  background: radial-gradient(ellipse at center, transparent 58%, #02050822 100%);
-}
-.atmosphere {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.experience[data-renderer="cycles-film"] .loading-screen { background: transparent; }

@@ -1,95 +1,94 @@
 import { test, expect } from '@playwright/test'
 
 async function scrollTo(page, p) {
-  await page.evaluate(p => window.scrollTo({ top: (document.documentElement.scrollHeight - innerHeight)*p, behavior: 'instant' }), p)
+  await page.evaluate(p => scrollTo({ top: (document.documentElement.scrollHeight - innerHeight) * p, behavior: 'instant' }), p)
 }
-async function settled(page, p) {
-  await page.waitForFunction(p => {
-    const v = document.querySelector('video')
-    return v?.readyState >= 2 && !v.seeking && Math.abs(v.currentTime/v.duration - p) < .025
-  }, p)
-}
-async function pixels(page) {
-  return page.locator('video').evaluate(video => {
-    const c = document.createElement('canvas'); c.width = 64; c.height = 36
-    const ctx = c.getContext('2d'); ctx.drawImage(video, 0, 0, 64, 36)
-    const data = ctx.getImageData(0, 0, 64, 36).data
-    let hash = 2166136261, light = 0
-    for (let i = 0; i < data.length; i += 4) {
-      hash = Math.imul(hash ^ data[i], 16777619)
-      light += data[i] + data[i + 1] + data[i + 2]
-    }
-    return { hash: hash >>> 0, light }
+async function camera(page) {
+  return page.evaluate(() => {
+    const c = window.__AUREL_SCENE__.camera
+    const e = c.matrixWorld.elements
+    return { position: c.position.toArray(), direction: [-e[8], -e[9], -e[10]] }
   })
 }
-async function noInterface(page) {
-  expect(await page.locator('main').evaluate(main => {
-    const copy = main.cloneNode(true)
-    copy.querySelectorAll('canvas, video').forEach(node => node.remove())
-    return copy.textContent.trim()
-  })).toBe('')
-  await expect(page.locator('button, nav, header, footer, h1')).toHaveCount(0)
-}
 
-test('path-traced film renders and scrubs forward and backward without free look', async ({ page }) => {
-  const errors = []; const external = []
+test('plays only the directed shots, with straight side passes and rain after the rear view', async ({ page }) => {
+  const errors = []
   page.on('pageerror', e => errors.push(e.message))
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()) })
-  page.on('request', r => { if (r.url().startsWith('http') && !r.url().startsWith('http://127.0.0.1:3000')) external.push(r.url()) })
   await page.goto('/')
-  await expect(page.locator('main')).toHaveAttribute('data-renderer', 'cycles-film')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/)
-  const metadata = await page.locator('video').evaluate(v => ({ width:v.videoWidth, height:v.videoHeight, duration:v.duration, paused:v.paused }))
-  expect(metadata.width).toBe(1280); expect(metadata.height).toBe(720)
-  expect(metadata.duration).toBeGreaterThan(7); expect(metadata.paused).toBe(true)
-  await noInterface(page)
-  const overview = await pixels(page)
-  expect(overview.light).toBeGreaterThan(10000)
-  await page.screenshot({ path:'/tmp/aurel-film-overview.png' })
-  await scrollTo(page, .53); await settled(page, .53)
-  const aerial = await pixels(page)
-  expect(aerial.hash).not.toBe(overview.hash)
-  await page.screenshot({ path:'/tmp/aurel-film-aerial.png' })
-  await scrollTo(page, .89); await settled(page, .89)
-  const rain = await pixels(page)
-  expect(rain.hash).not.toBe(aerial.hash)
-  await page.screenshot({ path:'/tmp/aurel-film-rain.png' })
-  await scrollTo(page, .1); await settled(page, .1)
-  const before = await page.locator('video').evaluate(v => v.currentTime)
-  await page.mouse.move(350, 350); await page.mouse.down()
-  await page.mouse.move(700, 450, { steps:6 }); await page.mouse.up()
-  expect(Math.abs(await page.locator('video').evaluate(v => v.currentTime) - before)).toBeLessThan(.04)
-  await page.emulateMedia({ reducedMotion:'no-preference' })
-  await scrollTo(page, .73); await settled(page, .73)
-  expect(await page.locator('video').evaluate(v => v.paused)).toBe(true)
-  expect(await page.evaluate(() => Boolean(window.__AUREL_SCENE__))).toBe(false)
-  expect(errors).toEqual([]); expect(external).toEqual([])
+  await page.waitForFunction(() => window.__AUREL_SCENE__?.gl.info.render.triangles > 100000)
+  expect(await page.locator('main').evaluate(main => {
+    const rendered = main.cloneNode(true)
+    rendered.querySelectorAll('canvas').forEach(canvas => canvas.remove())
+    return rendered.textContent.trim()
+  })).toBe('')
+  await expect(page.locator('button, nav, header, footer, h1')).toHaveCount(0)
+  await page.screenshot({ path: '/tmp/aurel-cinema-overview.png' })
+
+  await scrollTo(page, 0.2)
+  await page.waitForFunction(() => Math.abs(window.__AUREL_SCENE__.camera.position.x - 4) < 0.01)
+  const front = await camera(page)
+  expect(front.direction[0]).toBeCloseTo(-1, 5)
+  expect(front.direction[1]).toBeCloseTo(0, 5)
+  expect(front.direction[2]).toBeCloseTo(0, 5)
+  await scrollTo(page, 0.35)
+  await page.waitForFunction(() => window.__AUREL_SCENE__.camera.position.z > 0.7)
+  const back = await camera(page)
+  expect(back.position[2]).toBeGreaterThan(front.position[2])
+  expect(back.direction).toEqual(front.direction)
+
+  await scrollTo(page, 0.55)
+  await page.waitForFunction(() => Math.abs(window.__AUREL_SCENE__.camera.position.z - 6.5) < 0.01)
+  expect((await camera(page)).position[0]).toBeCloseTo(0, 5)
+  expect(await page.evaluate(() => window.__AUREL_SCENE__.scene.getObjectByName('surface-water').visible)).toBe(false)
+  await scrollTo(page, 0.65)
+  await page.waitForFunction(() => window.__AUREL_SCENE__.scene.getObjectByName('rainfall').material.opacity > 0.15)
+  expect((await camera(page)).position[2]).toBeCloseTo(6.5, 2)
+
+  await scrollTo(page, 0.79)
+  await page.waitForFunction(() => Math.abs(window.__AUREL_SCENE__.camera.position.x - 3.5) < 0.01)
+  const wetBack = await camera(page)
+  await scrollTo(page, 0.95)
+  await page.waitForFunction(() => window.__AUREL_SCENE__.camera.position.z < -0.9)
+  const wetFront = await camera(page)
+  expect(wetFront.position[2]).toBeLessThan(wetBack.position[2])
+  expect(wetFront.direction[0]).toBeCloseTo(-1, 5)
+  expect(wetFront.direction[1]).toBeCloseTo(0, 5)
+  expect(wetFront.direction[2]).toBeCloseTo(0, 5)
+  await page.waitForFunction(() => window.__AUREL_SCENE__.scene.getObjectByName('surface-water').material.opacity > 0.6)
+  await page.screenshot({ path: '/tmp/aurel-cinema-wet-side.png' })
+
+  await page.mouse.move(400, 350)
+  await page.mouse.down()
+  await page.mouse.move(650, 420, { steps: 6 })
+  await page.mouse.up()
+  expect(await camera(page)).toEqual(wetFront)
+  expect(errors).toEqual([])
 })
 
-test('mobile keeps the full cinematic frame visible and supports seeking', async ({ browser }) => {
-  const context = await browser.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor:1, isMobile:true, hasTouch:true, reducedMotion:'reduce' })
+test('keeps the mobile frame text-free and the tracking camera side-on', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' })
   const page = await context.newPage()
   await page.goto('http://127.0.0.1:3000')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/)
-  await expect(page.locator('main')).toHaveAttribute('data-renderer', 'cycles-film')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
-  expect(await page.locator('video').evaluate(v => getComputedStyle(v).objectFit)).toBe('contain')
-  await scrollTo(page, .7); await settled(page, .7)
-  await noInterface(page)
-  await page.screenshot({ path:'/tmp/aurel-film-mobile.png' })
-  await context.close()
-})
-
-test('missing media falls back to a live 3D drone scene', async ({ page }) => {
-  await page.route(/\/cinema\/aurel-cycles\.(mp4|webm)/, route => route.abort())
-  await page.goto('/')
-  await expect(page.locator('main')).toHaveAttribute('data-renderer', 'webgl')
-  await expect(page.locator('.loading-screen')).toHaveClass(/loaded/)
   await page.waitForFunction(() => window.__AUREL_SCENE__?.gl.info.render.triangles > 100000)
-  await scrollTo(page, .5)
-  await page.waitForFunction(() => window.__AUREL_SCENE__.camera.position.y > 5.5)
-  const position = await page.evaluate(() => window.__AUREL_SCENE__.camera.position.toArray())
-  expect(position[0]).toBeGreaterThan(2)
-  expect(position[2]).toBeGreaterThan(4)
-  await noInterface(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+  expect(await page.locator('main').evaluate(main => {
+    const rendered = main.cloneNode(true)
+    rendered.querySelectorAll('canvas').forEach(canvas => canvas.remove())
+    return rendered.textContent.trim()
+  })).toBe('')
+  await page.screenshot({ path: '/tmp/aurel-cinema-mobile.png' })
+  await scrollTo(page, 0.85)
+  await page.waitForFunction(() => {
+    const { x, y, z } = window.__AUREL_SCENE__.camera.position
+    return x > 7 && Math.abs(y - 0.8) < 0.01 && z > 0 && z < 0.4
+  })
+  const side = await camera(page)
+  expect(side.direction[0]).toBeCloseTo(-1, 5)
+  expect(side.direction[1]).toBeCloseTo(0, 5)
+  expect(side.direction[2]).toBeCloseTo(0, 5)
+  expect(await page.locator('main').boundingBox()).toMatchObject({ x: 0, y: 0, width: 390, height: 844 })
+  await context.close()
 })

@@ -7,9 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:smoke": "playwright test",
-    "test:camera": "node --test tests/unit/*.test.mjs",
-    "cinema:prepare": "node scripts/prepare_cinema.mjs"
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -19,11 +17,8 @@
     "three": "^0.185.0"
   },
   "devDependencies": {
-    "@gltf-transform/core": "^4.5.1",
-    "@gltf-transform/extensions": "^4.5.1",
     "@playwright/test": "^1.64.1",
     "@vitejs/plugin-react": "^5.0.4",
-    "draco3dgltf": "^1.5.7",
     "vite": "^7.1.9"
   }
 }

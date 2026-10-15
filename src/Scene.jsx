@@ -1,7 +1,7 @@
 import { Suspense, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SHOTS, chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt } from './cinematography.js'
+import { SHOTS, chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt,cameraDriftAt,studioPulseAt } from './cinematography.js'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray } from './Weather.jsx'
@@ -9,7 +9,7 @@ import Effects from './Effects.jsx'
 
 function Director({ progress,reducedMotion,state,onChapter }) {
   const {camera,size}=useThree(),shown=useRef(progress.current),lastChapter=useRef(-1)
-  const target=useMemo(()=>new THREE.Vector3(),[])
+  const target=useMemo(()=>new THREE.Vector3(),[]),targetVector=useMemo(()=>new THREE.Vector3(),[])
   useFrame((_,delta)=>{
     const dt=Math.min(delta,.1)
     shown.current=reducedMotion?progress.current:THREE.MathUtils.damp(shown.current,progress.current,4,dt)
@@ -21,15 +21,18 @@ function Director({ progress,reducedMotion,state,onChapter }) {
     s.foam=reducedMotion?foamTarget:THREE.MathUtils.damp(s.foam,foamTarget,5,dt)
     s.spray=chapter.id==='foam'?sprayAt(chapter.local):0
     s.time+=reducedMotion?0:dt
+    s.pulse=!reducedMotion && chapter.index<2?studioPulseAt(s.time):0
     if(lastChapter.current!==chapter.index){lastChapter.current=chapter.index;onChapter(chapter.index)}
-    camera.position.fromArray(shot.position);camera.lookAt(target.fromArray(shot.target));camera.rotateZ(shot.roll)
+    camera.position.fromArray(shot.position);target.fromArray(shot.target)
+    if(!reducedMotion){const drift=cameraDriftAt(s.time);camera.position.add(targetVector.fromArray(drift));target.add(targetVector)}
+    camera.lookAt(target);camera.rotateZ(shot.roll)
     camera.fov=shot.fov;camera.updateProjectionMatrix();camera.updateMatrixWorld()
   },-1)
   return null
 }
 function Experience({ progress,reducedMotion,onReady }) {
   const [chapter,setChapter]=useState(chapterAt(progress.current).index)
-  const state=useRef({chapter,local:0,progress:0,rain:0,foam:0,spray:0,time:0,cut:0})
+  const state=useRef({chapter,local:0,progress:0,rain:0,foam:0,spray:0,time:0,pulse:0,cut:0})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>

@@ -12,17 +12,42 @@ for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
   if(Math.abs(row)+Math.abs(col)>3)continue
   ceiling.push([col*2.45+(row%2)*1.225,5.5,row*2.12])
 }
-function Hexagons({ capture=false, foam=false }) {
-  const mesh=useMemo(()=>{
-    const fixtures=ceiling.map(p=>({p,r:[Math.PI/2,0,Math.PI/6]}))
-    const material=new THREE.MeshBasicMaterial({color:foam?'#c3deff':'#dce9ee',toneMapped:false,side:THREE.DoubleSide})
-    material.color.multiplyScalar(capture?1.35:2.6)
-    const mesh=new THREE.InstancedMesh(new THREE.RingGeometry(1.32,1.365,6),material,fixtures.length),dummy=new THREE.Object3D()
-    fixtures.forEach(({p,r},i)=>{dummy.position.fromArray(p);dummy.rotation.set(...r);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)})
-    mesh.instanceMatrix.needsUpdate=true;mesh.name=capture?'hex-reflection-rig':'hexagon-lighting';return mesh
+function Hexagons({capture=false,foam=false,state}) {
+  const rig=useMemo(()=>{
+    const group=new THREE.Group();group.name=capture?'hex-reflection-rig':'suspended-led-fixtures'
+    const housingMaterial=new THREE.MeshStandardMaterial({color:'#171c21',metalness:.82,roughness:.32})
+    const lightMaterial=new THREE.MeshStandardMaterial({color:'#e9f3fc',emissive:foam?'#c3deff':'#dce9ee',emissiveIntensity:capture?1.35:2.6,roughness:.24,toneMapped:false})
+    const housing=new THREE.InstancedMesh(new THREE.CylinderGeometry(.067,.067,1,12),housingMaterial,126)
+    const diffuser=new THREE.InstancedMesh(new THREE.CylinderGeometry(.035,.035,1,12),lightMaterial,126)
+    const joints=new THREE.InstancedMesh(new THREE.SphereGeometry(.067,10,6),housingMaterial,126)
+    const lightJoints=new THREE.InstancedMesh(new THREE.SphereGeometry(.035,10,6),lightMaterial,126)
+    const suspension=new THREE.InstancedMesh(new THREE.CylinderGeometry(.004,.004,.8,6),housingMaterial,42)
+    housing.name='led-aluminum-housings';diffuser.name=capture?'led-reflection-diffusers':'hexagon-lighting'
+    joints.name='led-rounded-corners';lightJoints.name='led-diffuser-corners';suspension.name='led-suspension-cables'
+    const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),a=new THREE.Vector3(),b=new THREE.Vector3(),direction=new THREE.Vector3()
+    let index=0,cable=0
+    for(const [x,y,z] of ceiling)for(let edge=0;edge<6;edge++){
+      const angle=edge*Math.PI/3+Math.PI/6,next=angle+Math.PI/3
+      a.set(x+Math.cos(angle)*1.34,y,z+Math.sin(angle)*1.34)
+      b.set(x+Math.cos(next)*1.34,y,z+Math.sin(next)*1.34)
+      direction.subVectors(b,a)
+      dummy.position.copy(a).lerp(b,.5);dummy.quaternion.setFromUnitVectors(up,direction.clone().normalize());dummy.scale.set(1,direction.length(),1)
+      dummy.updateMatrix();housing.setMatrixAt(index,dummy.matrix)
+      dummy.position.y-=.055;dummy.scale.y-=.015;dummy.updateMatrix();diffuser.setMatrixAt(index,dummy.matrix)
+      dummy.position.copy(a);dummy.quaternion.identity();dummy.scale.setScalar(1);dummy.updateMatrix();joints.setMatrixAt(index,dummy.matrix)
+      dummy.position.y-=.055;dummy.updateMatrix();lightJoints.setMatrixAt(index,dummy.matrix)
+      if(edge===0 || edge===3){dummy.position.copy(a);dummy.position.y+=.4;dummy.updateMatrix();suspension.setMatrixAt(cable++,dummy.matrix)}
+      index++
+    }
+    group.add(housing,diffuser,joints,lightJoints,suspension)
+    group.traverse(mesh=>{if(mesh.isInstancedMesh)mesh.instanceMatrix.needsUpdate=true})
+    return {group,lightMaterial}
   },[capture,foam])
-  useEffect(()=>()=>{mesh.geometry.dispose();mesh.material.dispose()},[mesh])
-  return <primitive object={mesh}/>
+  useFrame(()=>{if(!capture)rig.lightMaterial.emissiveIntensity=2.6*(1+1.1*(state?.current.pulse??0))})
+  useEffect(()=>()=>{
+    const materials=new Set();rig.group.traverse(mesh=>{if(mesh.isMesh){mesh.geometry.dispose();materials.add(mesh.material)}});materials.forEach(material=>material.dispose())
+  },[rig])
+  return <primitive object={rig.group}/>
 }
 function Floor({ state }) {
   const floor=useRef()
@@ -48,16 +73,21 @@ function Floor({ state }) {
   </mesh>
 }
 function Studio({ state,foam }) {
+  const key=useRef(),left=useRef(),right=useRef(),rim=useRef()
+  useFrame(()=>{
+    const pulse=state.current.pulse
+    key.current.intensity=42*(1+.45*pulse)
+    left.current.intensity=(foam?4.5:2.5)*(1+.55*pulse)
+    right.current.intensity=3.5*(1+pulse);rim.current.intensity=40*(1+1.1*pulse)
+  })
   return <group name={foam?'foam-wash-chamber':'dark-hexagon-studio'}>
     <ambientLight intensity={.14}/>
-    <spotLight position={[1,9,-3]} angle={.85} penumbra={.75} intensity={42} castShadow shadow-mapSize={[2048,2048]} shadow-bias={-.00012}/>
-    <rectAreaLight position={[-4,3,0]} rotation={[0,-Math.PI/2,0]} width={5} height={2.5} intensity={foam?4.5:2.5} color={foam?'#9fd9ff':'#dbe6ef'}/>
-    <rectAreaLight position={[4,3,0]} rotation={[0,Math.PI/2,0]} width={5} height={3} intensity={3.5} color={foam?'#c2b8ff':'#fff1dc'}/>
-    <pointLight position={[0,4,6]} color="#c9e5ef" intensity={10} distance={20}/>
+    <spotLight name="studio-key-light" ref={key} position={[1,9,-3]} angle={.85} penumbra={.75} intensity={42} castShadow shadow-mapSize={[2048,2048]} shadow-bias={-.00012}/>
+    <rectAreaLight ref={left} position={[-4,3,0]} rotation={[0,-Math.PI/2,0]} width={5} height={2.5} intensity={foam?4.5:2.5} color={foam?'#9fd9ff':'#dbe6ef'}/>
+    <rectAreaLight ref={right} position={[4,3,0]} rotation={[0,Math.PI/2,0]} width={5} height={3} intensity={3.5} color={foam?'#c2b8ff':'#fff1dc'}/>
+    <pointLight ref={rim} position={[0,4,6]} color="#c9e5ef" intensity={40} distance={20}/>
     <Floor state={state}/>
-    {[[-22,5,0],[22,5,0]].map((p,i)=><mesh key={i} position={p} rotation={[0,Math.PI/2,0]}><planeGeometry args={[48,10]}/><meshStandardMaterial color="#091017" roughness={.85} side={THREE.DoubleSide}/></mesh>)}
-    {[-22,22].map(z=><mesh key={z} position={[0,5,z]}><planeGeometry args={[48,10]}/><meshStandardMaterial color="#0a1118" roughness={.85} side={THREE.DoubleSide}/></mesh>)}
-    <Hexagons foam={foam}/>
+    <Hexagons foam={foam} state={state}/>
     {foam && <>
       {[-2.1,2.1].map(x=><mesh key={x} position={[x,.004,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[.012,16]}/><meshBasicMaterial color={[.5,1.7,2]} toneMapped={false}/></mesh>)}
       {Array.from({length:60},(_,i)=><mesh key={i} position={[2.65,.001,-3+i*.1]}><boxGeometry args={[.45,.012,.019]}/><meshStandardMaterial color="#242e35" metalness={.9} roughness={.32}/></mesh>)}
@@ -80,9 +110,10 @@ function Environments({ chapter,state }) {
     scene.fog=chapter===2?new THREE.FogExp2('#d4bc98',.035):new THREE.Fog('#080e15',25,75)
     gl.shadowMap.needsUpdate=true
   },[chapter,scene,gl])
+  useFrame(()=>{scene.environmentIntensity=chapter===2?.85:.42*(1+.3*(state.current.pulse??0))})
   return <>
     {chapter===2?<Desert/>:<Studio state={state} foam={chapter===1}/>}
-    <Environment key={chapter} frames={1} resolution={256} files={chapter===2?undefined:'/environment/studio.hdr'} environmentIntensity={chapter===2?.85:.42}>
+    <Environment key={chapter} frames={1} resolution={256} environmentIntensity={chapter===2?.85:.42}>
       {chapter===2?<>
         <mesh><sphereGeometry args={[90,32,16]}/><shaderMaterial side={THREE.BackSide}
           vertexShader={`varying vec3 vDirection;void main(){vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`}
@@ -92,6 +123,7 @@ function Environments({ chapter,state }) {
         <mesh rotation={[-Math.PI/2,0,0]} position={[0,-1,0]}><planeGeometry args={[200,200]}/><meshBasicMaterial color="#b5a17e"/></mesh>
       </>:<>
         <Hexagons capture foam={chapter===1}/>
+        <Lightformer form="circle" position={[0,4,7]} scale={[8,3]} intensity={3.5} color="#e3edf5" target={[0,0,0]}/>
         <Lightformer position={[-5,3,0]} rotation={[0,Math.PI/2,0]} scale={[2,7]} intensity={1.7} color="#d8e8f2"/>
         <Lightformer position={[5,3,0]} rotation={[0,-Math.PI/2,0]} scale={[2,6]} intensity={1.5} color={chapter===1?'#c7bdff':'#fff0dc'}/>
       </>}

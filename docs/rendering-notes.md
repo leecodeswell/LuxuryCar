@@ -1,6 +1,6 @@
 # Live 3D rendering notes
 
-The user prefers the original live car over the offline-film experiment. This version extends that live experience and keeps the original studio shot structure. The soap and sunlight sequences are real-time 3D chapters, with desktop as the current priority. No additional model, paid asset, render service, or pre-rendered footage is used.
+The user prefers the original live car over the offline-film experiment. This version extends that live experience and keeps the straight studio side passes while replacing the stopped rear shot with a continuous wide arc. The soap and sunlight sequences are real-time 3D chapters, with desktop as the current priority. No additional model, paid asset, render service, or pre-rendered footage is used.
 
 ## Primary material reviewed
 
@@ -15,7 +15,7 @@ These sources informed material and rendering decisions. Studio artwork and prop
 
 ## Water
 
-The first chapter preserves the old side-on tracking shots and rain cue. The rear camera is substantially farther away, and the room's walls have moved beyond that flight.
+The first chapter preserves the side-on tracking shots and uses a wide, elevated, offset rear arc. Rain and mist now build together during the inward move from local progress 0.64 to 0.80; they do not appear while the camera is parked behind the car.
 
 The installed React Three Fiber version copies ShaderMaterial uniform wrappers when applying props. Weather materials explicitly bind the live uniform objects to the material, so frame-loop wetness, time, density, and spray updates reach GLSL. Regression checks inspect the actual material values, in addition to mesh visibility.
 
@@ -34,3 +34,13 @@ The shadow pass uses variance maps, whose float samplers remain compatible with 
 Instancing keeps fixture and particle draw calls low. Shadow maps are refreshed when sets change because the car is stationary. The shared model remains mounted while environments switch. The desert uses a hard directional light and warm hemisphere lighting against a sand-colored background, with exponential distance fog merging the ground into the void. A 768-pixel planar reflection, a limited transmission buffer, HDR bloom, and multisample antialiasing favor desktop rendering quality without a live path tracer. The environment has no exposed GPU; browser validation uses software WebGL and is not a measurement of visitors' hardware performance.
 
 The demo car's geometry and missing production textures remain fidelity limits. This implementation improves materials, lighting, weather, and shot design without claiming production automotive realism. Mobile tuning is deferred at the user's request.
+
+## Open studio, physical LEDs, and camera motion
+
+There are no studio wall meshes or ceiling plane. The old photographic studio HDR is not loaded, avoiding rectangular room reflections. A procedural capture contains the modeled hexagonal lights and authored light sources, while the visible set contains the car, floor, suspended fixtures, weather, and wash details.
+
+Each of the 21 hexagons has six round aluminum tube housings, six smaller luminous cylindrical diffusers set below the housings, round corner joints, and two suspension cables. Instancing batches the 126 segments per material. The same solid fixtures are included in the environment capture; these are no longer flat ring planes.
+
+All shot paths use Hermite interpolation with matching derivatives at knots. The studio side-pass endpoint tangents are constrained to their exact track velocity, so the connecting flights blend into horizontal translation without bending its optical axis. Duplicate rear keys and chapter start/end holds are removed. A slow bounded translation moves camera position and target together during idle scroll, preserving the authored viewing direction. Reduced motion disables this autonomous movement.
+
+Studio pulses use two smooth, bounded envelopes in a 15.5-second cycle, centered at 5.4 and 6.35 seconds. They modulate LED emission, real studio lights, and environment intensity together, rather than overlaying white frames. The reflection map is captured once; intensity modulation avoids recapturing it on every pulse frame. Reduced motion suppresses the pulses entirely. Tests check continuous camera velocity, approach/weather alignment, actual LED cylinder geometry, absence of wall meshes and the old HDR request, and rendered light/material response.

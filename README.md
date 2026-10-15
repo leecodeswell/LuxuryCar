@@ -2,11 +2,13 @@
 
 A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs three real-time scenes using the same Ferrari model. There is no video playback and no free-look or orbit control.
 
-1. **Ceiling-lit studio / rain:** the original overview and straight side-tracking shots, a much wider rear pullback, then rain and a closer rear-to-front pass. Hexagonal fixtures remain on the ceiling only; the walls are dark. Rain includes varied streaks, near-camera softness, floor rings, ballistic splashes, surface beads, and layered drifting mist.
-2. **Sprayed soap:** the wet car stays in the dark studio. A pressurized fan enters from off screen and sweeps from front to rear, progressively depositing the lather coat. Fine pores, dense surface froth, gravity trails, and ground suds remain; floating soap bubbles are removed. The spray ends before the final hero hold.
+1. **Ceiling-lit studio / rain:** a continuous overview and straight side-tracking shots, a wide rear arc, then rain building during the inward move and a closer rear-to-front pass. The studio has no walls or ceiling plane. Suspended hexagonal LED fixtures have cylindrical aluminum housings, round diffusers, joined corners, and suspension cables. Rain includes varied streaks, near-camera softness, floor rings, ballistic splashes, surface beads, and layered drifting mist.
+2. **Sprayed soap:** the wet car stays in the dark studio. A pressurized fan enters from off screen and sweeps from front to rear, progressively depositing the lather coat. Fine pores, dense surface froth, gravity trails, and ground suds remain; floating soap bubbles are removed. The spray ends before the final moving hero composition.
 3. **Desert void:** hard sunlight in an uninterrupted sand-colored expanse. The ground fades into a matching background, with no courtyard walls, fins, paving, or visible sky geometry. Dust, controlled glare, and subtle heat shimmer remain.
 
-Brief dips to black cover the environment cuts. The two new sequences pause at their opening and final compositions, leaving space in the pacing for future product copy. Scroll backward to reverse the entire story. Mouse movement and dragging do not steer the camera. Reduced-motion mode stops autonomous particle movement and removes camera easing while preserving deliberate scroll navigation.
+Brief dips to black cover environment cuts. All three camera paths have continuous velocity and no static scroll holds; the studio side tracks retain their horizontal optical axes. A small shared translation of position and aim keeps the camera moving gently while scroll is idle, without adding free-look or orbit control. Native scrolling remains reversible. Rain and mist begin together during the rear-to-car approach (local studio progress 0.64–0.80).
+
+In the two studio chapters, an occasional pair of brief light pulses modulates the actual key/fill/rim lights, LED emission, and reflection-environment intensity. The cycle is 15.5 seconds, with pulses separated by 0.95 seconds. Reduced-motion mode disables autonomous camera drift, light pulses, particle motion, and scroll easing while preserving scroll-directed shot navigation.
 
 ## Develop
 
@@ -45,10 +47,10 @@ See [rendering research and tradeoffs](docs/rendering-notes.md) for implementati
 
 ## Validation
 
-`test:camera` checks the original side-on passes, larger rear distance, camera clearance, continuous new flights, and chapter cuts. `test:smoke` checks the live desktop renderer, all three chapters, rain/droplet visibility, animation at rest, progressive soap application, removed wall fixtures/bubbles, desert simplicity, backward transitions, no visible interface or free look, no video, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
+`test:camera` checks the original side-on passes, larger rear distance, camera clearance, continuous new flights, and chapter cuts. `test:smoke` checks the live desktop renderer, all three chapters, rain/droplet visibility, animation at rest, progressive soap application, wall-free studio and modeled LED tubes, approach-timed weather, camera drift, studio light pulses, removed floating bubbles, desert simplicity, backward transitions, no visible interface or free look, no video, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
 
 ## Attribution
 
 The Ferrari model is credited to **vicent091036**, via the [Three.js car materials example](https://github.com/mrdoob/three.js/blob/dev/examples/webgl_materials_car.html). Original creator link: <https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6>. Original geometry is retained, with adapted materials, lighting, surface effects, and cinematography.
 
-The studio HDRI is **Studio Small 03, Greg Zaal / Poly Haven**, CC0: <https://polyhaven.com/a/studio_small_03>. Software notices are in `public/licenses/`. AUREL is an independent concept with no affiliation to Ferrari S.p.A.
+The unused legacy studio HDRI retained in the asset folder is **Studio Small 03, Greg Zaal / Poly Haven**, CC0: <https://polyhaven.com/a/studio_small_03>. It is no longer loaded: the studio reflection environment is generated from the modeled fixtures and authored light sources. Software notices are in `public/licenses/`. AUREL is an independent concept with no affiliation to Ferrari S.p.A.

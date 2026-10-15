@@ -61,6 +61,7 @@ test('continuous wet-to-foam studio, surface water, strobe-cleared mist, and aut
   await page.emulateMedia({reducedMotion:'no-preference'})
   await freezeLighting(page,.14)
   await scrollTo(page,.384+.00005)
+  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.progress>=.384)
   expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__.state.current;return [s.rain,s.precipitation,s.mist]})).toEqual([0,0,0])
   // Freeze only the authored event clock to inspect its complete recovery envelope.
   await freezeLighting(page,.35)

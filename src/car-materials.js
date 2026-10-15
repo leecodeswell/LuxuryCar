@@ -20,6 +20,11 @@ export function tailRegion(p) {
   return 'reflector'
 }
 
+export function isReverseLens(p) {
+  const x=p.x-(p.x<0?-.7758385:.767899)
+  return p.z>2.025 && p.z<2.06 && x*x+(p.y-.8754365)**2<.05**2
+}
+
 export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) {
   const textures=sourceTextures.map(t=>t.clone()),ownedGeometry=[]
   const [badges,paintNormal,paintRough,carbonColor,carbonNormal,leatherNormal,rubberNormal,lensNormal,tailColor,tailEmission]=textures
@@ -46,7 +51,9 @@ export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) 
   const reflector=physical('unlit red reflectors',{color:'#58090a',roughness:.22,clearcoat:1,clearcoatRoughness:.08,ior:1.49})
   const caliper=physical('red painted brake caliper',{color:'#a51712',metalness:.35,roughness:.32,clearcoat:.65})
   const front=physical('headlamp optical cover',{color:'#b9c5ce',metalness:.25,roughness:.12,clearcoat:1,clearcoatRoughness:.035,envMapIntensity:1})
-  const materials=new Set([paint,glass,wheel,badge,carbon,leather,rubber,chrome,metal,tail,stop,reflector,caliper,front])
+  const reverse=physical('clear reverse lamp optics',{color:'#8d979d',metalness:0,roughness:.24,normalMap:lensNormal,normalScale:new THREE.Vector2(.45,.45),clearcoat:1,clearcoatRoughness:.12,ior:1.49,envMapIntensity:.55})
+  const guide=physical('red LED diffuser',{color:'#9b0803',emissive:'#ff1707',emissiveIntensity:2.8,roughness:.26,clearcoat:.4})
+  const materials=new Set([paint,glass,wheel,badge,carbon,leather,rubber,chrome,metal,tail,stop,reflector,caliper,front,reverse,guide])
   const p=new THREE.Vector3()
   function project(mesh,mapper) {
     const g=mesh.geometry.clone(),a=g.attributes.position,uv=new Float32Array(a.count*2)
@@ -106,12 +113,31 @@ export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) 
     else if(/carbon/i.test(name)){mesh.material=carbon;planar(mesh,24)}
     else if(/tire/i.test(name)){mesh.material=rubber;planar(mesh,18)}
     else if(/leather|interior|carpet/i.test(name)){mesh.material=leather;planar(mesh,14)}
-    else if(/metal_chrome/i.test(name))mesh.material=chrome
+    else if(/metal_chrome/i.test(name)){
+      mesh.material=[chrome,reverse]
+      const g=project(mesh,p=>[(p.x-(p.x<0?-.7758385:.767899))/.1+.5,(p.y-.8754365)/.1+.5])
+      const position=g.attributes.position,idx=g.index,count=idx?idx.count:position.count,groups=[[],[]]
+      for(let i=0;i<count;i+=3){
+        p.set(0,0,0)
+        for(let j=0;j<3;j++)p.add(new THREE.Vector3().fromBufferAttribute(position,idx?idx.getX(i+j):i+j))
+        p.multiplyScalar(1/3).applyMatrix4(mesh.matrixWorld)
+        const group=isReverseLens(p)?1:0
+        for(let j=0;j<3;j++)groups[group].push(idx?idx.getX(i+j):i+j)
+      }
+      g.setIndex(groups.flat());g.clearGroups()
+      g.addGroup(0,groups[0].length,0);g.addGroup(groups[0].length,groups[1].length,1)
+    }
     else if(/metal_gray/i.test(name))mesh.material=metal
     else {
       mesh.material=mesh.material.clone();materials.add(mesh.material)
       applySurface(mesh.material,uniforms,{foam:!(/glass|light/i.test(name))})
     }
   })
+  for(const [side,x,z] of [['left',-.7758385,2.053],['right',.767899,2.052]]){
+    const geometry=new THREE.TorusGeometry(.074,.0025,8,96)
+    ownedGeometry.push(geometry)
+    const ring=new THREE.Mesh(geometry,guide);ring.name=`tail-light-guide-${side}`
+    ring.position.set(x,.8754365,z);model.attach(ring)
+  }
   return {paint,glass,dispose(){materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());ownedGeometry.forEach(g=>g.dispose())}}
 }

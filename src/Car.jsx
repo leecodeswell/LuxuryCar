@@ -4,6 +4,7 @@ import { useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import {createSprayContact} from './spray-contact.js'
 import {createWaterRunners,updateWaterRunners} from './water-runners.js'
 import { applySurface,seededRandom,latherGLSL } from './surface-materials.js'
 
@@ -13,9 +14,9 @@ export default function Car({ state,onReady }) {
   const items=useMemo(()=>{
     const rng=seededRandom(458), model=gltf.scene.clone(true)
     model.updateMatrixWorld(true)
-    const uniforms={uWet:{value:0},uFoam:{value:0},uRinse:{value:0},uSurfaceTime:{value:0}}
+    const uniforms={uWet:{value:0},uFoam:{value:0},uRinse:{value:0},uWashZ:{value:4},uSurfaceTime:{value:0}}
     const paint=applySurface(new THREE.MeshPhysicalMaterial({color:'#3b4548',metalness:.68,roughness:.28,clearcoat:1,clearcoatRoughness:.09,envMapIntensity:.8}),uniforms)
-    const glass=applySurface(new THREE.MeshPhysicalMaterial({color:'#adbcc3',metalness:0,roughness:.03,transmission:.8,thickness:.008,ior:1.46,clearcoat:1,transparent:true,opacity:1,envMapIntensity:.5}),uniforms,{foam:false})
+    const glass=applySurface(new THREE.MeshPhysicalMaterial({color:'#adbcc3',metalness:0,roughness:.03,transmission:.8,thickness:.008,ior:1.46,clearcoat:1,transparent:true,opacity:1,envMapIntensity:.5}),uniforms)
     const wheels=applySurface(new THREE.MeshPhysicalMaterial({color:'#1d242b',metalness:.92,roughness:.35,clearcoat:.2,envMapIntensity:.45}),uniforms)
     model.traverse(mesh=>{
       if(!mesh.isMesh)return
@@ -71,8 +72,8 @@ export default function Car({ state,onReady }) {
     const froth=new THREE.InstancedMesh(foamGeometry(),foamMaterial,18000);froth.name='foam-microbubbles';froth.frustumCulled=false;froth.visible=false
     const trails=[]
     for(let i=0;i<18000;i++){
-      sample();const r=.002+Math.pow(rng(),2)*.007
-      dummy.position.copy(point).addScaledVector(normal,.005+r*.35);dummy.quaternion.setFromUnitVectors(up,normal);dummy.scale.set(r,r*.85,r);dummy.updateMatrix();froth.setMatrixAt(i,dummy.matrix)
+      sample();const r=.004+Math.pow(rng(),2)*.012
+      dummy.position.copy(point).addScaledVector(normal,.018+r*.35);dummy.quaternion.setFromUnitVectors(up,normal);dummy.scale.set(r,r*.85,r);dummy.updateMatrix();froth.setMatrixAt(i,dummy.matrix)
       if(trails.length<38 && normal.y<.3 && point.y>.4 && Math.abs(point.x)>.65 && rng()<.12){
         const start=point.clone().addScaledVector(normal,.008),end=start.clone().add(new THREE.Vector3(0,-.06-rng()*.15,0))
         const mid=start.clone().lerp(end,.5).addScaledVector(normal,.003)
@@ -83,7 +84,7 @@ export default function Car({ state,onReady }) {
     trails.forEach(g=>g.dispose())
     const drips=new THREE.Mesh(trailGeometry,foamMaterial);drips.name='soap-runoff';drips.visible=false
     foamMaterial.onBeforeCompile=shader=>{
-      shader.uniforms.uFoam=uniforms.uFoam;shader.uniforms.uRinse=uniforms.uRinse
+      shader.uniforms.uFoam=uniforms.uFoam;shader.uniforms.uRinse=uniforms.uRinse;shader.uniforms.uWashZ=uniforms.uWashZ
       shader.vertexShader='varying vec3 vLatherWorld;\n'+shader.vertexShader
       shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
         vec4 latherPosition=vec4(transformed,1.);
@@ -96,10 +97,10 @@ export default function Car({ state,onReady }) {
         float coverage=latherMask(vLatherWorld);
         diffuseColor.a*=smoothstep(.18,.65,coverage);`)
     }
-    return {model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
+    return {sprayPose:{origin:new THREE.Vector3(),point:new THREE.Vector3(),normal:new THREE.Vector3()},sprayContact:createSprayContact(body),model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
 
   },[gltf])
-  useEffect(()=>{onReady()},[onReady])
+  useEffect(()=>{state.current.sprayContact=items.sprayContact;onReady()},[onReady,state,items])
   useEffect(()=>()=>{
     const materials=new Set()
     items.model.traverse(obj=>{if(obj.isMesh)materials.add(obj.material)})
@@ -109,13 +110,18 @@ export default function Car({ state,onReady }) {
     items.dropMaterial.dispose();items.foamMaterial.dispose()
   },[items])
   useFrame(()=>{
-    const s=state.current
+    const s=state.current,pose=items.sprayPose,contact=items.sprayContact
+    if(s.chapter>0){
+      pose.valid=contact.trace(s.chapter===2?s.rinse:s.applied,s.chapter===2,pose.origin,pose.point,pose.normal)
+      s.sprayPose=pose
+    }
+    items.uniforms.uWashZ.value=s.rinse<.001?contact.bounds.max.z+.4:s.rinse>.999?contact.bounds.min.z-.4:pose.point.z
     items.uniforms.uWet.value=s.rain;items.uniforms.uFoam.value=s.applied;items.uniforms.uRinse.value=s.rinse;items.uniforms.uSurfaceTime.value=s.time
     items.paint.roughness=THREE.MathUtils.lerp(.28,.15,s.rain)
     items.paint.clearcoatRoughness=THREE.MathUtils.lerp(.09,.04,s.rain)
-    items.paint.clearcoat=1-s.foam*.35
-    items.glass.clearcoat=1-s.foam*.15
-    items.glass.transmission=.8*(1-s.foam*.12);items.glass.opacity=1
+    items.paint.clearcoat=1-s.foam*.85
+    items.glass.clearcoat=1-s.foam*.8
+    items.glass.transmission=.8*(1-s.foam);items.glass.opacity=1
     items.drops.visible=s.rain>.02;items.dropMaterial.opacity=s.rain*.96
     items.foamMaterial.opacity=1
     updateWaterRunners(items.runners,s.time,s.rain,s.foam)

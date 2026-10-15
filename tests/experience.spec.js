@@ -32,6 +32,14 @@ test('continuous wet-to-foam studio, surface water, persistent mist, and authore
   await expect(page.locator('video,button,nav,header,footer,h1')).toHaveCount(0)
   expect(await page.locator('main').evaluate(main=>{const copy=main.cloneNode(true);copy.querySelectorAll('canvas').forEach(c=>c.remove());return copy.textContent.trim()})).toBe('')
   expect(errors).toEqual([])
+  const traced=await page.evaluate(()=>{
+    const s=window.__AUREL_SCENE__,contact=s.state.current.sprayContact,origin=s.camera.position.clone(),point=origin.clone(),normal=origin.clone(),misses=[]
+    for(const reverse of [false,true])for(let i=0;i<=100;i++){
+      if(!contact.trace(i/100,reverse,origin,point,normal)||!contact.bounds.clone().expandByScalar(.001).containsPoint(point)||Math.abs(normal.length()-1)>.0001)misses.push([reverse,i])
+    }
+    return misses
+  })
+  expect(traced).toEqual([])
   const original=await identities(page)
   const setup=await page.evaluate(()=>{
     const scene=window.__AUREL_SCENE__.scene,runner=scene.getObjectByName('running-water-droplets')
@@ -88,7 +96,7 @@ test('continuous wet-to-foam studio, surface water, persistent mist, and authore
   const finish=await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,froth:s.scene.getObjectByName('foam-microbubbles').count,spray:s.scene.getObjectByName('offscreen-soap-spray').visible}})
   expect(finish).toEqual({chapter:1,foam:1,mist:1,froth:18000,spray:false})
   expect(await identities(page)).toEqual(original)
-  await capture(page,'natural-foam');await healthy(page)
+  await capture(page,'heavy-foam');await healthy(page)
   await scrollTo(page,.82-.00001);const rinseBefore=await camera(page)
   await scrollTo(page,.82+.00001);const rinseAfter=await camera(page)
   expect(Math.hypot(...rinseBefore.map((v,i)=>v-rinseAfter[i]))).toBeLessThan(.005)
@@ -96,8 +104,14 @@ test('continuous wet-to-foam studio, surface water, persistent mist, and authore
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('offscreen-rinse-spray').visible)).toBe(true)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.rinse)).toBeGreaterThan(.4)
   await capture(page,'rinsing')
+  const contact=await page.evaluate(()=>{const s=window.__AUREL_SCENE__,pose=s.state.current.sprayPose,jet=s.scene.getObjectByName('offscreen-rinse-spray').children[0].material.uniforms;return {valid:pose.valid,distance:jet.uHit.value.distanceTo(pose.point),normal:jet.uNormal.value.dot(pose.normal)}})
+  expect(contact.valid).toBe(true);expect(contact.distance).toBeLessThan(.025);expect(contact.normal).toBeGreaterThan(.999)
+  await scrollTo(page,.955)
+  expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {body:s.state.current.rinse,floor:s.state.current.floorRinse,groundVisible:s.scene.getObjectByName('ground-lather').visible,bodySpray:s.scene.getObjectByName('offscreen-rinse-spray').visible,floorSprays:[1,-1].every(i=>s.scene.getObjectByName(`floor-rinse-${i}`).visible)}})).toMatchObject({body:1,groundVisible:true,bodySpray:false,floorSprays:true})
+  await capture(page,'floor-wash')
   await scrollTo(page,1)
   expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,rinse:s.state.current.rinse,wet:s.state.current.rain,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,runners:s.scene.getObjectByName('running-water-droplets').visible,froth:s.scene.getObjectByName('foam-microbubbles').visible,spray:s.scene.getObjectByName('offscreen-rinse-spray').visible}})).toEqual({chapter:2,foam:0,rinse:1,wet:1,mist:1,runners:true,froth:false,spray:false})
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('ground-lather').visible)).toBe(false)
   expect(await identities(page)).toEqual(original)
   await capture(page,'rinsed-hero');await healthy(page)
   await scrollTo(page,.81)

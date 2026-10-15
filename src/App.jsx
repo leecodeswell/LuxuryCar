@@ -42,7 +42,7 @@ export default function App() {
 
   return <>
     <div className="scroll-space" aria-hidden="true" />
-    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="A continuous live 3D car showcase: rain, running water droplets, persistent mist, uneven sprayed foam, and a progressive pressure-water rinse in an open LED studio.">
+    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="A continuous live 3D car showcase: rain, running water droplets, persistent mist, a heavy sprayed foam coating, and progressive body and floor rinses in an open LED studio.">
       <div className="stage">
         <RenderBoundary onError={markReady}>
           <Scene progress={progress} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} />

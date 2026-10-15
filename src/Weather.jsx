@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import {floorWashGLSL} from './spray-contact.js'
 import { seededRandom } from './surface-materials.js'
 
 // Fiber preserves uniform targets by copying their wrappers. Bind our live uniform
@@ -96,37 +97,56 @@ uniform float uWet;varying vec2 vUv;varying float vAlpha;void main(){float d=len
   </>
 }
 
-export function SoapSpray({state,rinse=false}) {
+export function SoapSpray({state,rinse=false,floorSide=0}) {
   const mesh=useRef()
-  const geometry=useMemo(()=>particleGeometry(4800,1026,r=>[r(),r(),r(),r()]),[])
-  const uniforms=useMemo(()=>({uTime:{value:0},uSpray:{value:0},uCoverage:{value:0},uRinsing:{value:rinse?1:0},uGain:{value:1}}),[])
+  const geometry=useMemo(()=>particleGeometry(floorSide?2200:4800,1026,r=>[r(),r(),r(),r()]),[])
+  const uniforms=useMemo(()=>({uTime:{value:0},uSpray:{value:0},uCoverage:{value:0},uOrigin:{value:new THREE.Vector3()},uHit:{value:new THREE.Vector3()},uNormal:{value:new THREE.Vector3(0,1,0)},uGround:{value:floorSide?1:0},uGain:{value:1}}),[])
   useEffect(()=>()=>geometry.dispose(),[geometry])
-  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;uniforms.uSpray.value=rinse?s.rinseSpray:s.spray;uniforms.uCoverage.value=rinse?s.rinse:s.applied;mesh.current.visible=uniforms.uSpray.value>.003})
-  return <group ref={mesh} name={rinse?"offscreen-rinse-spray":"offscreen-soap-spray"}>
+  useFrame(()=>{
+    const s=state.current,fade=THREE.MathUtils.smoothstep(s.local,.56,.62)
+    let intensity=rinse?s.rinseSpray:s.spray
+    if(rinse)intensity*=floorSide?fade:1-fade
+    uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain
+    uniforms.uSpray.value=intensity;uniforms.uCoverage.value=rinse?s.rinse:s.applied
+    mesh.current.visible=intensity>.003
+    if(!mesh.current.visible)return
+    if(floorSide){
+      const z=THREE.MathUtils.lerp(-3.8,3.8,s.floorRinse)
+      uniforms.uHit.value.set(floorSide*1.65,.02,z)
+      uniforms.uOrigin.value.set(floorSide*7,3.8,z-.8)
+      uniforms.uNormal.value.set(0,1,0)
+    }else if(s.sprayPose?.valid){
+      uniforms.uOrigin.value.copy(s.sprayPose.origin)
+      uniforms.uHit.value.copy(s.sprayPose.point).addScaledVector(s.sprayPose.normal,.018*(1-s.rinse))
+      uniforms.uNormal.value.copy(s.sprayPose.normal)
+    }else mesh.current.visible=false
+  })
+  return <group ref={mesh} name={floorSide?`floor-rinse-${floorSide}`:rinse?"offscreen-rinse-spray":"offscreen-soap-spray"}>
     <mesh name={rinse?"rinse-spray-droplets":"soap-spray-droplets"} geometry={geometry} frustumCulled={false}>
     <shaderMaterial transparent depthWrite={false} uniforms={uniforms} onUpdate={bindUniforms(uniforms)} side={THREE.DoubleSide}
-      vertexShader={`attribute vec4 aSeed;uniform float uTime,uCoverage,uRinsing;varying vec2 vUv;varying float vAlpha;
-        void main(){vUv=uv;float flight=fract(uTime*2.8+aSeed.y);float front=mix(mix(-2.7,2.9,uCoverage),mix(3.2,-3.2,uCoverage),uRinsing);
-          vec3 origin=vec3(7.,mix(3.8,5.2,uRinsing),front-1.4),hit=vec3(.55,.95,clamp(front,-2.15,2.15));
+      vertexShader={`attribute vec4 aSeed;uniform float uTime,uCoverage,uGround;uniform vec3 uOrigin,uHit,uNormal;varying vec2 vUv;varying float vAlpha;
+        void main(){vUv=uv;float flight=fract(uTime*2.8+aSeed.y);
+          vec3 origin=uOrigin,hit=uHit;
           vec3 axis=normalize(hit-origin),right=normalize(cross(axis,vec3(0,1,0))),up=cross(right,axis);
-          float angle=aSeed.x*6.283185,radius=sqrt(aSeed.z)*(.035+flight*.52);
+          float angle=aSeed.x*6.283185,radius=sqrt(aSeed.z)*(.012+sin(flight*3.14159)*.14+flight*mix(.055,1.5,uGround));
           vec3 p=mix(origin,hit,flight)+right*cos(angle)*radius+up*sin(angle)*radius;
-          p.y-=flight*flight*.13;
+          p.y-=flight*(1.-flight)*.13;
           vec4 view=viewMatrix*vec4(p,1.);
           vec2 along=normalize((viewMatrix*vec4(axis,0.)).xy+vec2(.0001,0.)),across=vec2(-along.y,along.x);
           view.xy+=across*position.x*(.002+aSeed.w*.004)+along*position.y*(.012+aSeed.w*.02);
-          gl_Position=projectionMatrix*view;vAlpha=smoothstep(0.,.05,flight)*(1.-smoothstep(.87,1.,flight));}`}
+          gl_Position=projectionMatrix*view;vAlpha=smoothstep(0.,.05,flight)*(1.-smoothstep(.97,1.,flight));}`}
       fragmentShader={`uniform float uGain;
 uniform float uSpray;varying vec2 vUv;varying float vAlpha;
         void main(){float d=length((vUv-.5)*2.);gl_FragColor=vec4(.84,.91,.97,exp(-d*d*3.7)*vAlpha*uSpray*.48);${colorOutput}}`}/>
     </mesh>
     {rinse && <mesh name="rinse-impact-aerosol" geometry={geometry} frustumCulled={false}>
       <shaderMaterial transparent depthWrite={false} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
-        vertexShader={`attribute vec4 aSeed;uniform float uTime,uCoverage;varying vec2 vUv;varying float vAlpha;
-          void main(){vUv=uv;float age=fract(uTime*3.5+aSeed.x),t=age*.36;
-            float front=mix(3.2,-3.2,uCoverage),angle=aSeed.y*6.283185;
-            vec3 p=vec3(.7,.92,clamp(front,-2.15,2.15));
-            p+=vec3(.7+cos(angle)*1.6,1.2+aSeed.z*2.,sin(angle)*1.6)*t;
+        vertexShader={`attribute vec4 aSeed;uniform float uTime,uCoverage;uniform vec3 uHit,uNormal;varying vec2 vUv;varying float vAlpha;
+          void main(){vUv=uv;float age=fract(uTime*5.5+aSeed.x),t=age*.16;
+            float angle=aSeed.y*6.283185;
+            vec3 n=normalize(uNormal),tangent=normalize(cross(n,abs(n.y)>.9?vec3(1,0,0):vec3(0,1,0))),bitangent=cross(n,tangent);
+            vec3 velocity=n*(.6+aSeed.z*1.2)+(tangent*cos(angle)+bitangent*sin(angle))*(.4+aSeed.w*1.1);
+            vec3 p=uHit+n*.012+velocity*t;
             p.y-=4.9*t*t;vec4 view=viewMatrix*vec4(p,1.);
             view.xy+=position.xy*(.006+aSeed.w*.018);gl_Position=projectionMatrix*view;
             vAlpha=pow(1.-age,2.)*smoothstep(0.,.06,age);}`}
@@ -134,14 +154,15 @@ uniform float uSpray;varying vec2 vUv;varying float vAlpha;
           void main(){float d=length(vUv-.5)*2.;gl_FragColor=vec4(.7,.84,.93,exp(-d*d*4.)*vAlpha*uSpray*.4);${colorOutput}}`}/>
     </mesh>}
     <mesh name={rinse?"rinse-spray-fan":"soap-spray-fan"} frustumCulled={false}>
-      <planeGeometry args={[1,1]}/>
+      <planeGeometry args={[1,1,1,24]}/>
       <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
-        vertexShader={`uniform float uCoverage,uRinsing;varying vec2 vUv;
-          void main(){vUv=uv;float flight=uv.y;float front=mix(mix(-2.7,2.9,uCoverage),mix(3.2,-3.2,uCoverage),uRinsing);
-            vec3 origin=vec3(7.,mix(3.8,5.2,uRinsing),front-1.4),hit=vec3(.55,.95,clamp(front,-2.15,2.15));
-            vec3 center=mix(origin,hit,flight);center.y-=flight*flight*.13;
+        vertexShader={`uniform float uCoverage,uGround;uniform vec3 uOrigin,uHit;varying vec2 vUv;
+          void main(){vUv=uv;float flight=uv.y;
+            vec3 origin=uOrigin,hit=uHit;
+            vec3 center=mix(origin,hit,flight);center.y-=flight*(1.-flight)*.13;
             vec3 axis=normalize(hit-origin),right=normalize(cross(axis,normalize(cameraPosition-center)));
-            vec3 p=center+right*(uv.x-.5)*(.035+flight*1.12);
+            right=mix(right,vec3(1,0,0),uGround);
+            vec3 p=center+right*(uv.x-.5)*(.02+sin(flight*3.14159)*.32+flight*mix(.12,4.4,uGround));
             gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`}
         fragmentShader={`uniform float uGain;
 uniform float uTime,uSpray;varying vec2 vUv;${noise}
@@ -149,7 +170,7 @@ uniform float uTime,uSpray;varying vec2 vUv;${noise}
             float edge=pow(max(0.,1.-lateral*lateral),2.);
             float flow=fbm(vec2(vUv.x*14.,vUv.y*38.-uTime*19.));
             float core=exp(-lateral*lateral*30.)*.075;
-            float fade=smoothstep(0.,.04,vUv.y)*(1.-smoothstep(.87,1.,vUv.y));
+            float fade=smoothstep(0.,.04,vUv.y)*(1.-smoothstep(.98,1.,vUv.y));
             gl_FragColor=vec4(.86,.93,.98,(edge*flow*.22+core)*fade*uSpray);
             ${colorOutput}
           }`}/>
@@ -190,28 +211,49 @@ uniform float uTime,uDensity;varying vec2 vUv;varying vec3 vWorld;varying float 
   </>
 }
 
-// Small irregular runoff patches stay close to drip lines, rather than covering
-// the studio floor. Rinse spreads and dilutes these remnants deterministically.
+// Broad connected pools use the original five runoff regions, with denser
+// geometric froth. The two floor jets erase the same spatial wash front.
 export function GroundLather({state}) {
   const mesh=useRef()
-  const geometry=useMemo(()=>particleGeometry(70,231,r=>[(r()<.5?-1:1)*(1.05+r()*.5),(r()-.5)*4.7,r(),r()]),[])
-  const uniforms=useMemo(()=>({uFoam:{value:0},uRinse:{value:0},uTime:{value:0},uGain:{value:1}}),[])
-  useEffect(()=>()=>geometry.dispose(),[geometry])
-  useFrame(()=>{const s=state.current;uniforms.uFoam.value=s.applied;uniforms.uRinse.value=s.rinse;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;mesh.current.visible=s.applied>.02})
-  return <mesh ref={mesh} name="ground-lather" geometry={geometry} frustumCulled={false}>
-    <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
-      vertexShader={`attribute vec4 aSeed;uniform float uRinse;varying vec2 vUv;varying vec2 vWorld;varying float vSeed;
-        void main(){vUv=uv;vSeed=aSeed.w;float size=(.07+aSeed.z*.17)*(1.+uRinse*.6);
-          vec3 p=vec3(aSeed.x+position.x*size,.016+aSeed.w*.002,aSeed.y+position.y*size*1.7);
-          p.x+=sign(aSeed.x)*uRinse*aSeed.z*.22;vWorld=p.xz;gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`}
-      fragmentShader={`uniform float uFoam,uRinse,uTime,uGain;varying vec2 vUv,vWorld;varying float vSeed;${noise}
-        void main(){float edge=1.-smoothstep(.2,.5,length(vUv-.5));
-          float holes=smoothstep(.3,.65,fbm(vUv*12.+vSeed*17.));
-          float front=mix(-2.7,2.9,uFoam);
-          float deposit=(1.-smoothstep(front-.4,front+.4,vWorld.y))*smoothstep(.05,.3,uFoam);
-          float pores=mix(.6,1.,noise(vUv*95.));
-          gl_FragColor=vec4(vec3(.68,.77,.81)*pores,edge*holes*deposit*(1.-uRinse*.86)*.72);
-          ${colorOutput}
-        }`}/>
-  </mesh>
+  const patches=useMemo(()=>[[1.3,-1.3,.7,1.1],[1.45,.8,.75,1.5],[-1.3,-.9,.72,1.5],[-1.35,1.65,.7,1.1],[.25,2.45,1.55,.65]],[])
+  const geometry=useMemo(()=>particleGeometry(patches.length,231,(_,i)=>patches[i]),[patches])
+  const uniforms=useMemo(()=>({uFoam:{value:0},uFloorRinse:{value:0},uGain:{value:1}}),[])
+  const froth=useMemo(()=>{
+    const material=new THREE.MeshPhysicalMaterial({color:'#e1ebef',roughness:.76,transparent:true,alphaTest:.02,depthWrite:false})
+    material.onBeforeCompile=shader=>{
+      Object.assign(shader.uniforms,uniforms)
+      shader.vertexShader='varying vec3 vFoamWorld;\n'+shader.vertexShader
+      shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+        vFoamWorld=(modelMatrix*instanceMatrix*vec4(transformed,1.)).xyz;`)
+      shader.fragmentShader=floorWashGLSL+'varying vec3 vFoamWorld;\n'+shader.fragmentShader
+      shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        diffuseColor.a*=floorSoapAt(vFoamWorld);`)
+    }
+    const bubbles=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),material,1800),rng=seededRandom(749),dummy=new THREE.Object3D()
+    bubbles.name='floor-foam-froth';bubbles.frustumCulled=false
+    for(let i=0;i<1800;i++){
+      const [x,z,sx,sz]=patches[i%patches.length],angle=rng()*Math.PI*2,d=Math.sqrt(rng())*.95,r=.008+rng()*.025
+      dummy.position.set(x+Math.cos(angle)*d*sx,.022,z+Math.sin(angle)*d*sz)
+      dummy.scale.set(r,r*.55,r);dummy.updateMatrix();bubbles.setMatrixAt(i,dummy.matrix)
+    }
+    return bubbles
+  },[patches,uniforms])
+  useEffect(()=>()=>{geometry.dispose();froth.geometry.dispose();froth.material.dispose()},[geometry,froth])
+  useFrame(()=>{const s=state.current;uniforms.uFoam.value=s.applied;uniforms.uFloorRinse.value=s.floorRinse;uniforms.uGain.value=s.gain;mesh.current.visible=froth.visible=s.applied>.02 && s.floorRinse<1})
+  return <>
+    <mesh ref={mesh} name="ground-lather" geometry={geometry} frustumCulled={false}>
+      <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
+        vertexShader={`attribute vec4 aSeed;varying vec2 vUv;varying vec3 vWorld;
+          void main(){vUv=uv;vWorld=vec3(aSeed.x+position.x*aSeed.z*2.,.018,aSeed.y+position.y*aSeed.w*2.);
+            gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`}
+        fragmentShader={`uniform float uGain;varying vec2 vUv;varying vec3 vWorld;${noise}${floorWashGLSL}
+          void main(){float contour=length((vUv-.5)*2.)+(fbm(vWorld.xz*9.)-.5)*.23;
+            float edge=1.-smoothstep(.83,1.,contour);
+            float pores=mix(.68,1.,noise(vWorld.xz*240.));
+            gl_FragColor=vec4(vec3(.78,.85,.89)*pores,edge*floorSoapAt(vWorld)*.94);
+            ${colorOutput}
+          }`}/>
+    </mesh>
+    <primitive object={froth}/>
+  </>
 }

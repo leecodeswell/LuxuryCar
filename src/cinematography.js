@@ -20,7 +20,7 @@ export const FOAM_SHOTS = [
 export const RINSE_SHOTS = [
   {...FOAM_SHOTS.at(-1),p:0},
   {p:.28,position:[5.4,1.8,-7.4],target:[0,.72,-.6],fov:36,roll:-.012},
-  {p:.58,position:[4.4,1.3,.8],target:[0,.8,.5],fov:35,roll:.008},
+  {p:.58,position:[5.8,1.6,.2],target:[0,.8,0],fov:35,roll:.008},
   {p:.8,position:[4.8,2.8,6.8],target:[0,.65,.4],fov:38,roll:.012},
   {p:1,position:[7.8,3.5,8.5],target:[0,.65,0],fov:36,roll:0},
 ]
@@ -92,10 +92,15 @@ export function cameraDriftAt(time) {
 }
 
 export function rinseAt(progress) {
-  const t=Math.min(1,Math.max(0,(progress-.08)/.78))
+  const t=Math.min(1,Math.max(0,(progress-.08)/.48))
   return t*t*(3-2*t)
 }
 export function rinseSprayAt(progress) {
   const smooth=(a,b)=>{const t=Math.min(1,Math.max(0,(progress-a)/(b-a)));return t*t*(3-2*t)}
   return smooth(.025,.07)*(1-smooth(.85,.94))
+}
+
+export function floorRinseAt(progress) {
+  const t=Math.min(1,Math.max(0,(progress-.62)/.26))
+  return t*t*(3-2*t)
 }

@@ -1,10 +1,10 @@
-# Continuous wet-to-foam studio
+# Continuous rain, foam, and rinse studio
 
 One live car, floor, camera rig, fixture array, reflection capture, and mist system remain mounted for the whole experience. The desert chapter and all chapter-cut fades are removed. Desktop remains the current priority.
 
 ## Flow
 
-The dry reveal, horizontal side pass, wide rear arc, and rainy inward approach occupy the first 60% of scroll. Soap application and the final moving foam compositions occupy the remaining 40%. The soap path begins at the exact position, target, lens, and roll of the rain path's final shot. Its initial tangent is scaled by the chapter durations, matching velocity in global scroll space. There is no environment swap, camera teleport, fade, or exposure step at the join.
+The dry reveal, horizontal side pass, wide rear arc, and rainy inward approach occupy the first 60% of scroll. Soap application occupies 60–82%; body rinsing and the floor wash occupy 82–100%. The soap path begins at the exact position, target, lens, and roll of the rain path's final shot. Its initial tangent is scaled by the chapter durations, matching velocity in global scroll space. There is no environment swap, camera teleport, fade, or exposure step at the join.
 
 The studio has no walls or ceiling plane. Twenty-one suspended hexagonal LED fixtures use round aluminum housings, luminous cylindrical diffusers, rounded corner joints, and suspension cables. The photographic room HDR is unused. A single procedural environment capture contains the modeled lights and authored reflection sources.
 
@@ -28,7 +28,9 @@ The installed React Three Fiber version copies ShaderMaterial uniform wrappers w
 
 ## Thick foam on the car
 
-The off-screen fan progressively sweeps from front to rear. The deposited surface raises the exterior by approximately 18 mm, with about 4 mm of lump variation, rough pore relief, and 18,000 surface froth instances. The coat replaces metallic response with opaque, rough white shading and covers the glass, wheels, and exterior hardware as well as the body. Small runoff trails remain on body panels. The former ground-lather instances and large foam pools are removed entirely.
+The off-screen fan progressively sweeps from front to rear. The deposited surface raises the exterior by approximately 18 mm, with about 4 mm of lump variation, rough pore relief, and 18,000 surface froth instances. The coat replaces metallic response with opaque, rough white shading and covers glass, wheels, and exterior hardware as well as the body. Panel runoff remains. Five broad irregular runoff regions on the floor carry another 1,800 froth clusters. A spatial floor-wash mask clears both the base pools and these clusters under the floor-directed jets.
+
+The body jet uses a downward surface probe followed by a nozzle-to-panel intersection against a Three.js Octree of the actual body. The first intersected triangle supplies the shared jet endpoint, splash origin, outward normal, and wash-front height/position. The pressure fan narrows at contact and rebound particles have a short lifetime, preventing detached splash clouds over the low nose. The body wash finishes before two floor jets sweep the ground pools. Neither floor nor body foam disappears through a global opacity fade.
 
 The coating is procedural and artist-authored. It does not simulate spray collision, viscosity, drainage, bubble collapse, or multiple scattering through real lather.
 

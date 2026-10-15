@@ -1,7 +1,7 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SHOTS, chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,cameraDriftAt } from './cinematography.js'
+import { SHOTS, chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,floorRinseAt,cameraDriftAt } from './cinematography.js'
 import {createLightingDirector,advanceLighting} from './lighting.js'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
@@ -18,6 +18,7 @@ function Director({ progress,reducedMotion,state }) {
     s.chapter=chapter.index;s.local=chapter.local;s.progress=shown.current
     const applied=chapter.id==='foam'?foamAt(chapter.local):chapter.id==='rinse'?1:0
     s.rinse=chapter.id==='rinse'?rinseAt(chapter.local):0
+    s.floorRinse=chapter.id==='rinse'?floorRinseAt(chapter.local):0
     s.applied=applied
     const foamTarget=applied*(1-s.rinse)
     const rainTarget=chapter.id==='studio'?rainfallAt(chapter.local):1-foamTarget*.25
@@ -37,14 +38,14 @@ function Director({ progress,reducedMotion,state }) {
   return null
 }
 function Experience({ progress,reducedMotion,onReady }) {
-  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,foam:0,applied:0,rinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
+  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
     <Suspense fallback={null}>
       <Environments state={state}/>
       <Car state={state} onReady={onReady}/>
-      <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><GroundLather state={state}/>
+      <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
     </Suspense>
     <Director progress={progress} reducedMotion={reducedMotion} state={state}/>
     <Effects state={state}/>

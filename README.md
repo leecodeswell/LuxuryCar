@@ -3,8 +3,8 @@
 A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs one continuous live 3D car showcase. There is no video playback or free-look control.
 
 1. **Reveal and rain (0–60%):** horizontal side tracks connect to a wide rear arc. Rain, mist, glimmering microbeads, 12,000 geometric beads, and up to 256 surface-following water runners build during the inward move.
-2. **Natural sprayed foam (60–82%):** off-screen application leaves uneven raised patches, thin streaks, pore relief, and 18,000 small froth instances masked to the same coverage as the paint. Exposed wet paint and clear glass preserve the shape of the car. Small irregular suds collect near the drip lines; the floor stays mostly exposed.
-3. **Pressure-water rinse (82–100%):** a directional water fan and impact aerosol sweep rear to front. The spatial wash front clears both the coating and geometric froth, revealing wet paint, beads, and moving runners. Ground suds spread slightly and dilute; the mist persists through the final wet hero shot.
+2. **Heavy sprayed foam (60–82%):** off-screen application builds an almost complete raised white coat, with pore relief, panel streaks, and 18,000 froth instances. The glass and wheels are coated too. Five broad, connected runoff regions surround the car, with 1,800 geometric froth clusters on the floor.
+3. **Pressure-water rinse (82–100%):** a directional water fan and impact aerosol sweep rear to front. The jet endpoint, splashback, and clearing edge follow intersections with the actual body, including the sloping nose. After the body clears, two floor-directed fans sweep front to rear through the ground foam, clearing the pools and geometric froth. Mist persists through the final wet hero shot.
 
 The wall-free studio, solid suspended LED hexagons, floor, car, and reflection rig remain mounted throughout. The desert is removed. There is no cut or fade between rain, soap, and rinse. Camera position, aim, lens, and global velocity match at both joins; subtle idle translation keeps the rig moving without orbiting.
 
@@ -38,9 +38,10 @@ This is live WebGL rasterization with physically based materials, HDR/environmen
 
 - `src/cinematography.js`: the three continuous phase ranges, authored camera paths, matching join tangents, and weather timing.
 - `src/Scene.jsx`: one shared model, camera, clock, lighting director, and effect state. The studio remains mounted.
-- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water, uneven foam, and spatial rinse detail, deterministic surface samples, and instanced beads/froth.
+- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water, heavy foam, and spatial rinse detail, deterministic surface samples, and instanced beads/froth.
 - `src/Environments.jsx`: solid suspended hexagon fixtures, persistent reflection capture, and wet floor.
-- `src/Weather.jsx`: GPU rain, ballistic splashes, off-screen soap and water spray, impact aerosol, small ground suds, persistent layered mist. Raindrops fall continuously while stationary unless reduced motion is enabled.
+- `src/Weather.jsx`: GPU rain, ballistic splashes, off-screen soap and water spray, impact aerosol, broad ground foam pools, persistent layered mist. Raindrops fall continuously while stationary unless reduced motion is enabled.
+- `src/spray-contact.js`: geometry-based spray contacts and the shared floor-clearing mask.
 - `src/water-runners.js`: pretraced downhill paths on the actual body, using the built-in Three.js Octree.
 - `src/lighting.js`: authored lighting cues and the nonrepeating failure/recovery envelope.
 - `src/Effects.jsx`: HDR bloom, tone mapping, antialiasing, and the lighting-failure blackout shutter.
@@ -49,7 +50,7 @@ See [rendering research and tradeoffs](docs/rendering-notes.md) for implementati
 
 ## Validation
 
-`test:camera` checks horizontal tracks, rear clearance, continuously moving paths, exact phase-join position/velocity, rain timing, and authored lighting lifecycle. `test:smoke` checks the desktop renderer, bead/runner counts and movement, persistent object identities across both joins, pixel-black lighting failure, bright recovery, uneven foam, localized ground suds, progressive rinse, no desert, persistent mist after spraying, reverse scrolling, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
+`test:camera` checks horizontal tracks, rear clearance, continuously moving paths, exact phase-join position/velocity, rain timing, and authored lighting lifecycle. `test:smoke` checks the desktop renderer, bead/runner counts and movement, persistent object identities across both joins, pixel-black lighting failure, bright recovery, heavy foam, broad ground pools, body/floor rinse, no desert, persistent mist after spraying, reverse scrolling, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
 
 ## Attribution
 

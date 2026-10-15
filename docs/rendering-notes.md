@@ -1,46 +1,45 @@
-# Live 3D rendering notes
+# Continuous wet-to-foam studio
 
-The user prefers the original live car over the offline-film experiment. This version extends that live experience and keeps the straight studio side passes while replacing the stopped rear shot with a continuous wide arc. The soap and sunlight sequences are real-time 3D chapters, with desktop as the current priority. No additional model, paid asset, render service, or pre-rendered footage is used.
+One live car, floor, camera rig, fixture array, reflection capture, and mist system remain mounted for the whole experience. The desert chapter and all chapter-cut fades are removed. Desktop remains the current priority.
 
-## Primary material reviewed
+## Flow
 
-| Source | Verified material | Applied treatment |
-| --- | --- | --- |
-| [Google Filament material documentation](https://github.com/google/filament/blob/main/docs/Materials.md.html), especially clear coat and iridescence | Distinguishes the dielectric clearcoat over car paint from base metallic response. Describes thin-film reflection as angle- and thickness-dependent interference, with useful film thicknesses on the order of visible wavelengths. | Separate paint, water, and opaque froth materials. Floating thin-film bubbles were removed at the user’s request. Dense lather uses rough, nonmetallic shading instead of treating the entire coat as transparent glass. |
-| [Three.js physical material shader](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js) and [physical transmission example](https://github.com/mrdoob/three.js/blob/dev/examples/webgl_materials_physical_transmission.html) | Physical shading has distinct roughness, metalness, clearcoat normals, transmission, and IOR. Transmission and alpha opacity represent different effects. | Dielectric water beads use IOR 1.333, surface thickness, and transmission. World-space microbeads perturb both base and clearcoat normals; wetness reduces roughness. Foam replaces the metallic response with a rough white layer and reduces the clearcoat. |
-| [Drei Environment](https://github.com/pmndrs/drei/blob/master/src/core/Environment.tsx) and the installed implementation | Supports a captured scene environment with authored light shapes, and finite capture frames. | Visible ceiling-only instanced hexagon fixtures are also represented in the captured lighting rig so their shapes appear in the car's reflections. The rig is recaptured when the environment changes, not six times on every animation frame. |
-| [Three.js UnrealBloomPass](https://github.com/mrdoob/three.js/blob/dev/examples/jsm/postprocessing/UnrealBloomPass.js) | Uses a downsampled mip chain to spread bright highlights at several scales. | Restrained HDR bloom emphasizes fixtures and sun glints. Final tone mapping is applied after the HDR effects. Excessive glow was reduced after reviewing actual browser frames. |
+The dry reveal, horizontal side pass, wide rear arc, and rainy inward approach occupy the first 60% of scroll. Soap application and the final moving foam compositions occupy the remaining 40%. The soap path begins at the exact position, target, lens, and roll of the rain path's final shot. Its initial tangent is scaled by the chapter durations, matching velocity in global scroll space. There is no environment swap, camera teleport, fade, or exposure step at the join.
 
-These sources informed material and rendering decisions. Studio artwork and proprietary site code were not copied. See [showcase research](showcase-research.md) for the further studio research and its application to pacing and future copy.
+The studio has no walls or ceiling plane. Twenty-one suspended hexagonal LED fixtures use round aluminum housings, luminous cylindrical diffusers, rounded corner joints, and suspension cables. The photographic room HDR is unused. A single procedural environment capture contains the modeled lights and authored reflection sources.
 
-## Water
+## Authored lighting failures
 
-The first chapter preserves the side-on tracking shots and uses a wide, elevated, offset rear arc. Rain and mist now build together during the inward move from local progress 0.64 to 0.80; they do not appear while the camera is parked behind the car.
+`src/lighting.js` triggers a recovery envelope when the rendered camera crosses global scroll positions 0.31, 0.52, and 0.84. These are selected rear, wet-detail, and foam moments, not a repeating timer. Each event completes while scrolling is idle; rewinding sufficiently before a cue rearms it for another forward pass. Fast scrolling plays the latest crossed cue rather than queuing a succession of failures.
 
-The installed React Three Fiber version copies ShaderMaterial uniform wrappers when applying props. Weather materials explicitly bind the live uniform objects to the material, so frame-loop wetness, time, density, and spray updates reach GLSL. Regression checks inspect the actual material values, in addition to mesh visibility.
+The envelope briefly flickers, goes completely dark, overshoots to seven times normal illumination, drops below normal, then regulates over 1.9 seconds. Actual LED emission, ambient/key/fill/rim lighting, environment intensity, and weather shading follow the same gain. Exposure briefly rises during the overshoot. A final HDR shutter guarantees full black during the blackout interval, including emissive car parts, mist, rain, and bloom. The additive CSS grade was removed so it cannot tint a black frame. This shutter is unrelated to the soap boundary.
 
-Rain uses 9,000 instanced camera-facing streaks animated on the GPU, with variable speed, width, length, lighting, and near-camera softness. Varying fall speeds and lengths replace uniform CPU-updated lines. Depth testing lets the car occlude rain, and a simple vehicle envelope suppresses streaks beneath the body. This is an approximation, not mesh-accurate rain collision.
+Reduced-motion mode suppresses lighting failures, autonomous camera drift, particle movement, and camera easing. The camera paths still follow deliberate scrolling.
 
-Two water scales serve different viewing distances: geometric surface beads give silhouette and highlight detail, while world-space microbeads and vertical rivulets supply finer normal detail. Geometry deposition is staggered across the rainfall onset. Ground impact rings and shallow animated ripples connect the rain to the floor. Ground impacts also launch 1,800 short ballistic splash particles. Mist now uses 32 depth-tested upright billboards with advected fractal noise, soft boundaries, floor-height attenuation, and approximate vehicle exclusion. This replaces the single horizontal mist plane; it is not volumetric light transport or scene-depth soft-particle rendering.
+## Water and persistent atmosphere
 
-## Foam
+The existing world-space bead normal field and clearcoat glimmer are preserved, with additional fine-scale relief. Geometric water beads increase from 2,800 to 12,000. Surface deposition remains staggered as the rain builds during the inward approach.
 
-A thin raised surface coat, rough pore detail, 9,000 instanced froth bubbles, runoff trails, and ground lather make the soap visibly different from white paint. There are no floating soap-film bubbles. A noisy continuous spray fan and 4,800 droplets enters from an off-screen source and sweeps front-to-rear. The same deposition progress controls the spray target, a world-space front across the coating, and the visibility of surface froth. The car begins wet and uncoated; the spray starts, builds the coat, then stops before the final composition. The layer is artist-authored, with procedural coverage and gravity-oriented trails; it does not simulate fluid flow, bubble coalescence, or multiple scattering through a real foam volume.
+Up to 256 larger moving droplets follow downhill paths traced against the actual body mesh. Three.js's built-in Octree constructs an acceleration structure during setup; short rays sample the exterior at progressively lower heights. Paths break at missing surfaces or large jumps, rather than crossing wheel openings or floating across seams. The frame loop samples the precomputed curves and orients elongated drops along their tangents. There are no per-frame raycasts, new model assets, or new dependencies. This is an authored surface-flow approximation, not a fluid solver or droplet coalescence simulation.
 
-## Cost and limits
+The rain curtain and floor splashes fade smoothly during the first 16% of the soap pass, independently of surface wetness and persistent mist, so no particle system pops off at the join. Rain uses GPU-animated streaks, camera-distance softness, varied fall speeds, floor impact rings, and ballistic splash particles. Thirty-two depth-tested mist wisps use animated fractal noise, soft boundaries, floor-height attenuation, and approximate vehicle exclusion. Mist reaches full density with the rain and remains at that density throughout soap application and after the spray stops; it no longer follows spray intensity.
 
-The shadow pass uses variance maps, whose float samplers remain compatible with the planar reflection across scene transitions. A hardware comparison sampler produced a reproducible type mismatch in the environment transition in the installed stack. Desktop checks now assert native WebGL status at scene boundaries.
+The installed React Three Fiber version copies ShaderMaterial uniform wrappers when applying props. Weather materials explicitly bind the live uniform objects so time, density, wetness, spray, and light-gain changes reach GLSL.
 
-Instancing keeps fixture and particle draw calls low. Shadow maps are refreshed when sets change because the car is stationary. The shared model remains mounted while environments switch. The desert uses a hard directional light and warm hemisphere lighting against a sand-colored background, with exponential distance fog merging the ground into the void. A 768-pixel planar reflection, a limited transmission buffer, HDR bloom, and multisample antialiasing favor desktop rendering quality without a live path tracer. The environment has no exposed GPU; browser validation uses software WebGL and is not a measurement of visitors' hardware performance.
+## Thick foam on the car
 
-The demo car's geometry and missing production textures remain fidelity limits. This implementation improves materials, lighting, weather, and shot design without claiming production automotive realism. Mobile tuning is deferred at the user's request.
+The off-screen fan progressively sweeps from front to rear. The deposited surface raises the exterior by approximately 18 mm, with about 4 mm of lump variation, rough pore relief, and 18,000 surface froth instances. The coat replaces metallic response with opaque, rough white shading and covers the glass, wheels, and exterior hardware as well as the body. Small runoff trails remain on body panels. The former ground-lather instances and large foam pools are removed entirely.
 
-## Open studio, physical LEDs, and camera motion
+The coating is procedural and artist-authored. It does not simulate spray collision, viscosity, drainage, bubble collapse, or multiple scattering through real lather.
 
-There are no studio wall meshes or ceiling plane. The old photographic studio HDR is not loaded, avoiding rectangular room reflections. A procedural capture contains the modeled hexagonal lights and authored light sources, while the visible set contains the car, floor, suspended fixtures, weather, and wash details.
+## Sources and limits
 
-Each of the 21 hexagons has six round aluminum tube housings, six smaller luminous cylindrical diffusers set below the housings, round corner joints, and two suspension cables. Instancing batches the 126 segments per material. The same solid fixtures are included in the environment capture; these are no longer flat ring planes.
+| Primary source | Application |
+| --- | --- |
+| [Filament material documentation](https://github.com/google/filament/blob/main/docs/Materials.md.html) | Separate dielectric clearcoat/water from rough, opaque, nonmetallic foam. |
+| [Three.js physical shaders](https://github.com/mrdoob/three.js/blob/dev/src/renderers/shaders/ShaderLib/meshphysical.glsl.js) | Distinct roughness, metalness, clearcoat normals, transmission, thickness, and IOR. Water uses IOR 1.333. |
+| [Three.js Octree implementation](https://github.com/mrdoob/three.js/blob/dev/examples/jsm/math/Octree.js) | World-space triangle construction and closest ray intersection for pretraced surface-water paths. |
+| [Drei Environment](https://github.com/pmndrs/drei/blob/master/src/core/Environment.tsx) | One captured reflection rig without repeated scene/environment replacement. |
+| [Three.js UnrealBloomPass](https://github.com/mrdoob/three.js/blob/dev/examples/jsm/postprocessing/UnrealBloomPass.js) | HDR highlights bloom before final tone mapping and the blackout shutter. |
 
-All shot paths use Hermite interpolation with matching derivatives at knots. The studio side-pass endpoint tangents are constrained to their exact track velocity, so the connecting flights blend into horizontal translation without bending its optical axis. Duplicate rear keys and chapter start/end holds are removed. A slow bounded translation moves camera position and target together during idle scroll, preserving the authored viewing direction. Reduced motion disables this autonomous movement.
-
-Studio pulses use two smooth, bounded envelopes in a 15.5-second cycle, centered at 5.4 and 6.35 seconds. They modulate LED emission, real studio lights, and environment intensity together, rather than overlaying white frames. The reflection map is captured once; intensity modulation avoids recapturing it on every pulse frame. Reduced motion suppresses the pulses entirely. Tests check continuous camera velocity, approach/weather alignment, actual LED cylinder geometry, absence of wall meshes and the old HDR request, and rendered light/material response.
+This remains real-time rasterization, with a 768-pixel planar floor reflection, a reduced transmission buffer, variance shadow maps, HDR bloom, and multisample antialiasing. Geometry and texture quality of the original free demo car limit ultimate fidelity. Software-browser checks verify rendering and behavior, not a visitor's hardware frame rate. Mobile tuning remains deferred.

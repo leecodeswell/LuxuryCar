@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {CHAPTERS,SHOTS,chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt,cameraDriftAt,studioPulseAt} from '../../src/cinematography.js'
+import {CHAPTERS,SHOTS,chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,cameraDriftAt} from '../../src/cinematography.js'
+import {LIGHT_CUES,lightingAt,createLightingDirector,advanceLighting} from '../../src/lighting.js'
 const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]))
 
 test('studio retains straight horizontal side tracks and a wide moving rear arc',()=>{
@@ -51,20 +52,45 @@ test('idle camera translation is subtle, continuous, and keeps moving',()=>{
     assert(Math.hypot(...a)<.11);assert(distance(a,b)/.001>.001)
   }
 })
-test('studio light pulses are occasional and smoothly bounded',()=>{
-  assert.equal(studioPulseAt(0),0);assert.equal(studioPulseAt(10),0)
-  assert.equal(studioPulseAt(5.4),1);assert(Math.abs(studioPulseAt(6.35)-.55)<1e-10)
-  let active=0
-  for(let i=0;i<1550;i++){const t=i/100,v=studioPulseAt(t);assert(v>=0 && v<=1);if(v>0)active++;assert(Math.abs(v-studioPulseAt(t+15.5))<1e-10)}
-  assert(active<130)
+test('rain joins soap with matching camera position, aim, lens, and global velocity',()=>{
+  assert.deepEqual(CHAPTERS.map(c=>c.id),['studio','foam'])
+  const h=1e-6
+  const at=p=>{const c=chapterAt(p);return shotAt(c.local,16/9,c.shots)}
+  const a=at(.6-h),b=at(.6),c=at(.6+h)
+  for(const key of ['position','target'])for(let i=0;i<3;i++){
+    assert(Math.abs(a[key][i]-c[key][i])<.001)
+    assert(Math.abs((b[key][i]-a[key][i])/h-(c[key][i]-b[key][i])/h)<.03)
+  }
+  assert(Math.abs(a.fov-c.fov)<.001);assert.equal(chapterAt(1).id,'foam')
 })
-test('chapter cuts reverse cleanly and soap precedes the desert finale',()=>{
-  assert.deepEqual(CHAPTERS.map(c=>c.id),['studio','foam','sunlight'])
-  assert.equal(chapterAt(0).shots,SHOTS);assert.equal(chapterAt(.5).id,'foam');assert.equal(chapterAt(.9).id,'sunlight')
-  assert.equal(chapterAt(1).local,1)
-  for(const boundary of [.44,.72]){assert.equal(cutFadeAt(boundary),1);assert.equal(cutFadeAt(boundary-.02),0);assert.equal(cutFadeAt(boundary+.02),0)}
+test('soap is progressively applied and stays on through the end',()=>{
   assert.equal(foamAt(0),0);assert.equal(sprayAt(0),0)
   assert.equal(foamAt(.08),0);assert(sprayAt(.08)>.99)
   assert(foamAt(.35)>0 && foamAt(.35)<1);assert.equal(sprayAt(.35),1)
   assert.equal(foamAt(.8),1);assert.equal(sprayAt(.8),0)
+})
+test('authored lighting failure blacks out, overshoots, dips, and settles',()=>{
+  assert.equal(lightingAt(.35).blackout,1);assert.equal(lightingAt(.35).gain,0)
+  assert.equal(lightingAt(.64).gain,7);assert(lightingAt(.64).exposure>1.5)
+  assert(Math.abs(lightingAt(1.04).gain-.2)<1e-10)
+  assert.deepEqual(lightingAt(2),{gain:1,blackout:0,exposure:1})
+})
+test('lighting triggers once per authored crossing, completes while idle, and rearms on rewind',()=>{
+  const director=createLightingDirector()
+  advanceLighting(director,LIGHT_CUES[0]-.01,.016)
+  advanceLighting(director,LIGHT_CUES[0]+.001,.016)
+  assert.equal(director.age,0)
+  const dark=advanceLighting(director,LIGHT_CUES[0]+.001,.35)
+  assert.equal(dark.blackout,1)
+  for(let i=0;i<1000;i++)advanceLighting(director,LIGHT_CUES[0]+.001,.1)
+  assert.equal(lightingAt(director.age).gain,1);assert(director.age>90)
+  advanceLighting(director,0,.016);advanceLighting(director,LIGHT_CUES[0]+.001,.016);assert.equal(director.age,0)
+  assert.deepEqual(advanceLighting(director,.9,.016,true),{gain:1,blackout:0,exposure:1})
+  assert.equal(LIGHT_CUES.length,3);assert(!LIGHT_CUES.includes(.6))
+})
+
+test('rain curtain fades smoothly into the soap opening without drying the persistent mist',()=>{
+  assert.equal(precipitationAt(.6),1);assert.equal(precipitationAt(.67),0)
+  assert(Math.abs(precipitationAt(.6-1e-5)-precipitationAt(.6+1e-5))<1e-5)
+  assert(precipitationAt(.62)>precipitationAt(.64));assert(precipitationAt(.64)>0)
 })

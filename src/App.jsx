@@ -42,13 +42,12 @@ export default function App() {
 
   return <>
     <div className="scroll-space" aria-hidden="true" />
-    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="Three live 3D automotive sequences: a ceiling-lit studio with rain, a dark chamber with sprayed soap, and sunlight in a desert-colored void.">
+    <main className={`experience ${ready ? 'is-ready' : ''}`} aria-label="A continuous live 3D car showcase: rain, running water droplets, persistent mist, and a thick sprayed foam coating in an open LED studio.">
       <div className="stage">
         <RenderBoundary onError={markReady}>
           <Scene progress={progress} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} />
         </RenderBoundary>
       </div>
-      <div className="cinematic-grade" aria-hidden="true" />
       <div className={`loading-screen ${ready ? 'loaded' : ''}`} aria-hidden="true" />
       {unavailable && <div className="render-error" role="alert">The graphics connection was interrupted. Reload to return to the studio.</div>}
     </main>

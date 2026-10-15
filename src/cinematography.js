@@ -10,35 +10,22 @@ export const SHOTS = [
   { p:.83, position:[3.5,.9,1.65], target:[0,.9,1.65], fov:32 },
   { p:1, position:[3.5,.9,-1.65], target:[0,.9,-1.65], fov:32 },
 ]
-export const SUN_SHOTS = [
-  { p:0, position:[7.4,1.15,-7.8], target:[0,.62,-.7], fov:39, roll:-.015 },
-  { p:.22, position:[4.2,1.05,-4.5], target:[0,.65,-1], fov:38, roll:.01 },
-  { p:.5, position:[4.1,1.25,1.8], target:[0,.66,.7], fov:40, roll:.025 },
-  { p:.74, position:[4.5,3.6,5.7], target:[0,.6,.4], fov:40, roll:.02 },
-  { p:1, position:[-3.8,5.2,6.1], target:[0,.55,0], fov:40, roll:-.015 },
-]
 export const FOAM_SHOTS = [
-  { p:0, position:[5,2,-5], target:[0,.7,-.5], fov:38, roll:-.018 },
-  { p:.24, position:[2.65,1.1,-.2], target:[.2,.8,-.2], fov:36, roll:0 },
-  { p:.48, position:[3.4,1.6,3.6], target:[0,.8,1], fov:38, roll:.02 },
-  { p:.72, position:[4.7,4.3,5.1], target:[0,.65,.4], fov:40, roll:.025 },
+  { p:0, position:[3.5,.9,-1.65], target:[0,.9,-1.65], fov:32, roll:0 },
+  { p:.22, position:[4.2,1.65,-4.8], target:[0,.75,-.7], fov:36, roll:-.01 },
+  { p:.46, position:[3.2,1.5,.8], target:[0,.8,.8], fov:36, roll:.01 },
+  { p:.70, position:[4.8,4,5], target:[0,.65,.5], fov:40, roll:.025 },
   { p:1, position:[6.8,3.1,-6.7], target:[0,.65,0], fov:38, roll:0 },
 ]
 export const CHAPTERS = [
-  { id:'studio', start:0, end:.44, shots:SHOTS },
-  { id:'foam', start:.44, end:.72, shots:FOAM_SHOTS },
-  { id:'sunlight', start:.72, end:1, shots:SUN_SHOTS },
+  { id:'studio', start:0, end:.6, shots:SHOTS },
+  { id:'foam', start:.6, end:1, shots:FOAM_SHOTS },
 ]
 export function chapterAt(progress) {
   const p=Math.min(1,Math.max(0,progress))
-  const index=p<.44?0:p<.72?1:2
+  const index=p<.6?0:1
   const chapter=CHAPTERS[index]
   return { ...chapter, index, local:(p-chapter.start)/(chapter.end-chapter.start) }
-}
-export function cutFadeAt(progress) {
-  const distance=Math.min(Math.abs(progress-.44),Math.abs(progress-.72))
-  const t=Math.max(0,1-distance/.009)
-  return t*t*(3-2*t)
 }
 export function shotAt(progress, aspect=16/9, shots=SHOTS) {
   const studio=shots===SHOTS,p=Math.min(1,Math.max(0,progress))
@@ -49,6 +36,11 @@ export function shotAt(progress, aspect=16/9, shots=SHOTS) {
   const value=(key,axis)=>{
     const get=s=>axis===undefined?(s[key]??0):s[key][axis]
     const tangent=i=>{
+      // Match the final studio track in GLOBAL scroll space at the uncut join.
+      if(shots===FOAM_SHOTS && i===0){
+        const a=SHOTS.at(-2),b=SHOTS.at(-1)
+        return (get(b)-get(a))/(b.p-a.p)*(.4/.6)
+      }
       // Both ends of a side pass share its exact velocity. This preserves the
       // horizontal optical axis and makes its incoming/outgoing connector C1.
       const pair=sidePair(i)?i:sidePair(i-1)?i-1:-1
@@ -67,6 +59,12 @@ export function rainfallAt(progress) {
   const t=Math.min(1,Math.max(0,(progress-.64)/.16))
   return t*t*(3-2*t)
 }
+export function precipitationAt(progress) {
+  const chapter=chapterAt(progress)
+  if(chapter.id==='studio')return rainfallAt(chapter.local)
+  const t=Math.min(1,Math.max(0,chapter.local/.16))
+  return 1-t*t*(3-2*t)
+}
 export function foamAt(progress) {
   const t=Math.min(1,Math.max(0,(progress-.08)/.62))
   return t*t*(3-2*t)
@@ -80,9 +78,4 @@ export function sprayAt(progress) {
 // Position and aim move together: this does not introduce orbit or pointer control.
 export function cameraDriftAt(time) {
   return [.045*Math.sin(time*.19),.018*Math.sin(time*.23),.045*(Math.cos(time*.19)-1)]
-}
-export function studioPulseAt(time) {
-  const phase=((time%15.5)+15.5)%15.5
-  const pulse=(center,width)=>{const t=Math.max(0,1-Math.abs(phase-center)/width);return t*t*(3-2*t)}
-  return pulse(5.4,.3)+pulse(6.35,.32)*.55
 }

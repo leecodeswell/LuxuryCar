@@ -1,132 +1,97 @@
-import { test,expect } from '@playwright/test'
-import { createHash } from 'node:crypto'
+import {test,expect} from '@playwright/test'
 async function scrollTo(page,p){
   await page.evaluate(v=>window.scrollTo({top:(document.documentElement.scrollHeight-innerHeight)*v,behavior:'instant'}),p)
-  await page.waitForFunction(v=>Math.abs(window.__AUREL_SCENE__?.state.current.progress-v)<.001,p)
+  await page.waitForFunction(v=>Math.abs(window.__AUREL_SCENE__?.state.current.progress-v)<.0001,p)
 }
-async function camera(page){return page.evaluate(()=>{
-  const c=window.__AUREL_SCENE__.camera,e=c.matrixWorld.elements
-  return {position:c.position.toArray(),direction:[-e[8],-e[9],-e[10]]}
-})}
-async function noInterface(page){
-  expect(await page.locator('main').evaluate(main=>{const copy=main.cloneNode(true);copy.querySelectorAll('canvas').forEach(c=>c.remove());return copy.textContent.trim()})).toBe('')
-  await expect(page.locator('video,button,nav,header,footer,h1')).toHaveCount(0)
+async function healthy(page){
+  expect(await page.locator('canvas').evaluate(canvas=>{const gl=canvas.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})
 }
-async function capture(page,name){const data=await page.screenshot({path:`/tmp/aurel-desktop-${name}.png`});return createHash('sha256').update(data).digest('hex')}
-async function healthyWebGL(page){
-  expect(await page.locator('canvas').evaluate(canvas=>{
-    const gl=canvas.getContext('webgl2')
-    return {lost:gl.isContextLost(),error:gl.getError()}
-  })).toEqual({lost:false,error:0})
+async function capture(page,name){return page.screenshot({path:`/tmp/aurel-desktop-${name}.png`})}
+async function camera(page){return page.evaluate(()=>window.__AUREL_SCENE__.camera.position.toArray())}
+async function identities(page){return page.evaluate(()=>{const s=window.__AUREL_SCENE__.scene;return ['hero-car','studio-reflection-floor','hexagon-lighting','layered-rain-mist'].map(name=>s.getObjectByName(name).uuid).concat(s.environment.uuid)})}
+async function freezeLighting(page,age){
+  await page.evaluate(age=>{Object.defineProperty(window.__AUREL_SCENE__.state.current.lighting,'age',{configurable:true,get:()=>age,set:()=>{}})},age)
+  await page.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})
 }
+async function imageStats(page,png){return page.evaluate(async bytes=>{
+  const bitmap=await createImageBitmap(new Blob([new Uint8Array(bytes)],{type:'image/png'})),c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height
+  const ctx=c.getContext('2d');ctx.drawImage(bitmap,0,0);const data=ctx.getImageData(0,0,c.width,c.height).data
+  let max=0,total=0;for(let i=0;i<data.length;i+=4){max=Math.max(max,data[i],data[i+1],data[i+2]);total+=data[i]+data[i+1]+data[i+2]}
+  bitmap.close();return {max,mean:total/(c.width*c.height*3)}
+},Array.from(png))}
 
-test('desktop live 3D plays all three chapters, improved rain, foam, and reverse transitions',async({page})=>{
-  test.setTimeout(480000)
-  const errors=[],external=[],media=[],roomHDR=[]
+test('continuous wet-to-foam studio, surface water, persistent mist, and authored light failure',async({page})=>{
+  test.setTimeout(600000)
+  const errors=[],external=[],roomHDR=[]
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',m=>{if(m.type()==='error'||(m.type()==='warning' && /GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text())))errors.push(m.text())})
-  page.on('request',r=>{if(r.url().startsWith('http') && !r.url().startsWith('http://127.0.0.1:3000'))external.push(r.url());if(/\.(mp4|webm)/.test(r.url()))media.push(r.url());if(r.url().includes('/environment/studio.hdr'))roomHDR.push(r.url())})
+  page.on('request',r=>{if(r.url().startsWith('http')&&!r.url().startsWith('http://127.0.0.1:3000'))external.push(r.url());if(r.url().includes('/environment/studio.hdr'))roomHDR.push(r.url())})
   await page.goto('/')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:90000})
   await page.waitForFunction(()=>window.__AUREL_SCENE__?.gl.info.render.triangles>100000)
-  await noInterface(page)
-  await healthyWebGL(page)
-  const fixture=await page.evaluate(()=>{
-    const scene=window.__AUREL_SCENE__.scene,led=scene.getObjectByName('hexagon-lighting')
-    return {count:led.count,type:led.geometry.type,radius:led.geometry.parameters.radiusTop,
-      heights:Array.from({length:led.count},(_,i)=>led.instanceMatrix.array[i*16+13]),
-      housings:scene.getObjectByName('led-aluminum-housings').count,
-      cables:scene.getObjectByName('led-suspension-cables').count,
-      studioMeshes:scene.getObjectByName('dark-hexagon-studio').children.filter(o=>o.isMesh).map(o=>o.name)}
+  await expect(page.locator('video,button,nav,header,footer,h1')).toHaveCount(0)
+  expect(await page.locator('main').evaluate(main=>{const copy=main.cloneNode(true);copy.querySelectorAll('canvas').forEach(c=>c.remove());return copy.textContent.trim()})).toBe('')
+  expect(errors).toEqual([])
+  const original=await identities(page)
+  const setup=await page.evaluate(()=>{
+    const scene=window.__AUREL_SCENE__.scene,runner=scene.getObjectByName('running-water-droplets')
+    return {ledType:scene.getObjectByName('hexagon-lighting').geometry.type,ledCount:scene.getObjectByName('hexagon-lighting').count,
+      meshes:scene.getObjectByName('dark-hexagon-studio').children.filter(o=>o.isMesh).map(o=>o.name),
+      beads:scene.getObjectByName('surface-water').count,runners:runner.count,
+      descending:runner.userData.surfacePaths.every(path=>path.at(-1)[1]<path[0][1]),
+      groundFoam:!!scene.getObjectByName('foam-runoff-pools')||!!scene.getObjectByName('ground-lather'),
+      desert:!!scene.getObjectByName('sunlit-desert-void'),floatingBubbles:!!scene.getObjectByName('soap-film-bubbles')}
   })
-  expect(fixture.count).toBe(126);expect(fixture.type).toBe('CylinderGeometry');expect(fixture.radius).toBeGreaterThan(.03)
-  expect(fixture.heights.every(h=>Math.abs(h-5.445)<.001)).toBe(true)
-  expect(fixture.housings).toBe(126);expect(fixture.cables).toBe(42)
-  expect(fixture.studioMeshes).toEqual(['studio-reflection-floor'])
-  const overview=await capture(page,'overview')
-  await scrollTo(page,.18*.44)
-  const front=await camera(page);expect(front.direction[0]).toBeCloseTo(-1,5)
-  await scrollTo(page,.27*.44)
-  const back=await camera(page);expect(back.position[2]).toBeGreaterThan(front.position[2]);back.direction.forEach((v,i)=>expect(v).toBeCloseTo(front.direction[i],6))
-  await scrollTo(page,.55*.44)
-  const rear=await camera(page);expect(rear.position[2]).toBeGreaterThan(15);expect(rear.position[1]).toBeGreaterThan(3)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('surface-water').visible)).toBe(false)
-  await capture(page,'wide-rear')
-  await scrollTo(page,.69*.44)
-  const approaching=await camera(page),earlyRain=await page.evaluate(()=>window.__AUREL_SCENE__.state.current.rain)
-  expect(earlyRain).toBeGreaterThan(0);expect(earlyRain).toBeLessThan(.5)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').visible)).toBe(true)
-  await scrollTo(page,.78*.44)
-  const nearer=await camera(page),lateRain=await page.evaluate(()=>window.__AUREL_SCENE__.state.current.rain)
-  expect(Math.hypot(...nearer.position)).toBeLessThan(Math.hypot(...approaching.position))
-  expect(lateRain).toBeGreaterThan(earlyRain)
+  expect(setup.ledType).toBe('CylinderGeometry');expect(setup.ledCount).toBe(126)
+  expect(setup.meshes).toEqual(['studio-reflection-floor'])
+  expect(setup.beads).toBe(12000);expect(setup.runners).toBeGreaterThan(96);expect(setup.descending).toBe(true)
+  expect(setup.groundFoam).toBe(false);expect(setup.desert).toBe(false);expect(setup.floatingBubbles).toBe(false)
+  await scrollTo(page,.54*.6);await capture(page,'wide-rear')
+  await scrollTo(page,.78*.6)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value)).toBeGreaterThan(.8)
   await capture(page,'rain-approach')
-  await scrollTo(page,.95*.44)
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.rain>.96)
+  await scrollTo(page,.95*.6)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('surface-water').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('rain-impacts').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('rainfall').material.uniforms.uWet.value)).toBeCloseTo(1)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value)).toBeCloseTo(1)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('rain-impact-splashes').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').visible)).toBe(true)
-  const rain=await capture(page,'rain-detail');expect(rain).not.toBe(overview)
-  const fixed=await camera(page)
-  await page.mouse.move(400,350);await page.mouse.down();await page.mouse.move(700,450,{steps:5});await page.mouse.up()
-  expect(await camera(page)).toEqual(fixed)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('running-water-droplets').visible)).toBe(true)
+  await capture(page,'rain-detail');await healthy(page)
+  const before=await page.evaluate(()=>Array.from(window.__AUREL_SCENE__.scene.getObjectByName('running-water-droplets').instanceMatrix.array.slice(0,32)))
   await page.emulateMedia({reducedMotion:'no-preference'})
   const time=await page.evaluate(()=>window.__AUREL_SCENE__.state.current.time)
-  await page.waitForFunction(t=>window.__AUREL_SCENE__.state.current.time>t+.2,time)
-  const clocks=await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {scene:s.state.current.time,rain:s.scene.getObjectByName('rainfall').material.uniforms.uTime.value}})
-  expect(clocks.rain).toBeGreaterThan(.2);expect(clocks.rain).toBeCloseTo(clocks.scene,6)
-  expect(await capture(page,'rain-moving')).not.toBe(rain)
-  const moving=await camera(page),drift=Math.hypot(...moving.position.map((v,i)=>v-fixed.position[i]))
-  expect(drift).toBeGreaterThan(.0001);expect(drift).toBeLessThan(.11)
-  moving.direction.forEach((v,i)=>expect(v).toBeCloseTo(fixed.direction[i],6))
-  await page.evaluate(()=>{window.__AUREL_SCENE__.state.current.time=5.2})
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.pulse>.1)
-  const flash=await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {pulse:s.state.current.pulse,key:s.scene.getObjectByName('studio-key-light').intensity,led:s.scene.getObjectByName('hexagon-lighting').material.emissiveIntensity,environment:s.scene.environmentIntensity}})
-  expect(flash.pulse).toBeGreaterThan(.1);expect(flash.key).toBeGreaterThan(42);expect(flash.led).toBeGreaterThan(2.6);expect(flash.environment).toBeGreaterThan(.42)
+  await page.waitForFunction(t=>window.__AUREL_SCENE__.state.current.time>t+.3,time)
+  expect(await page.evaluate(()=>Array.from(window.__AUREL_SCENE__.scene.getObjectByName('running-water-droplets').instanceMatrix.array.slice(0,32)))).not.toEqual(before)
+  // Freeze only the authored event clock to inspect its complete recovery envelope.
+  await freezeLighting(page,.35)
+  const dark=await capture(page,'lighting-blackout'),blackStats=await imageStats(page,dark)
+  expect(blackStats.max).toBe(0)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('hexagon-lighting').material.emissiveIntensity)).toBe(0)
+  await freezeLighting(page,.64)
+  const bright=await imageStats(page,await capture(page,'lighting-overcorrection'))
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('studio-key-light').intensity)).toBeCloseTo(294)
+  await freezeLighting(page,1.04)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.gain)).toBeCloseTo(.2)
+  await freezeLighting(page,2)
+  const settled=await imageStats(page,await capture(page,'lighting-settled'))
+  expect(bright.mean).toBeGreaterThan(settled.mean*1.2)
+  await page.evaluate(()=>Object.defineProperty(window.__AUREL_SCENE__.state.current.lighting,'age',{configurable:true,writable:true,value:Infinity}))
   await page.emulateMedia({reducedMotion:'reduce'})
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.pulse===0)
-  await healthyWebGL(page)
-  await scrollTo(page,.445)
-  await page.waitForFunction(()=>Boolean(window.__AUREL_SCENE__.scene.getObjectByName('foam-wash-chamber')))
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.foam)).toBe(0)
-  await scrollTo(page,.53)
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.spray>.99)
+  await scrollTo(page,.6-.00001);const joinBefore=await camera(page)
+  await scrollTo(page,.6+.00001);const joinAfter=await camera(page)
+  expect(Math.hypot(...joinBefore.map((v,i)=>v-joinAfter[i]))).toBeLessThan(.005)
+  expect(await identities(page)).toEqual(original)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.blackout)).toBe(0)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value)).toBe(1)
+  await scrollTo(page,.75)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.spray)).toBeGreaterThan(.99)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('offscreen-soap-spray').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('soap-spray-droplets').material.uniforms.uSpray.value)).toBeCloseTo(1)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('soap-spray-fan').material.uniforms.uSpray.value)).toBeCloseTo(1)
-  const partial=await page.evaluate(()=>window.__AUREL_SCENE__.state.current.foam)
-  expect(partial).toBeGreaterThan(.1);expect(partial).toBeLessThan(.8)
   await capture(page,'soap-spraying')
-  await healthyWebGL(page)
-  await scrollTo(page,.67)
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.foam>.98)
-  const foam=await capture(page,'foam-detail');expect(foam).not.toBe(rain)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('foam-microbubbles').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('foam-runoff-pools').visible)).toBe(true)
-  expect(await page.evaluate(()=>Boolean(window.__AUREL_SCENE__.scene.getObjectByName('soap-film-bubbles')))).toBe(false)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('offscreen-soap-spray').visible)).toBe(false)
-  await healthyWebGL(page)
-  await scrollTo(page,.84)
-  await page.waitForFunction(()=>Boolean(window.__AUREL_SCENE__.scene.getObjectByName('sunlit-desert-void')) && window.__AUREL_SCENE__.state.current.foam<.015)
-  const sun=await capture(page,'sunlight');expect(sun).not.toBe(foam)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('sunlit-desert-void').children.filter(o=>o.isMesh).length)).toBe(1)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('sunlit-dust').visible)).toBe(true)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('foam-runoff-pools').visible)).toBe(false)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').visible)).toBe(false)
-  await healthyWebGL(page)
-  // Revisit the spray halfway through, then rewind to the still-wet uncoated car.
-  await scrollTo(page,.53)
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.spray>.99 && Boolean(window.__AUREL_SCENE__.scene.getObjectByName('foam-wash-chamber')))
-  await healthyWebGL(page)
-  await scrollTo(page,.445)
-  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.foam===0)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('foam-runoff-pools').visible)).toBe(false)
-  await scrollTo(page,0)
-  await page.waitForFunction(()=>Boolean(window.__AUREL_SCENE__.scene.getObjectByName('dark-hexagon-studio')))
-  await noInterface(page)
-  await healthyWebGL(page)
-  expect(errors).toEqual([]);expect(external).toEqual([]);expect(media).toEqual([]);expect(roomHDR).toEqual([])
+  await scrollTo(page,.96)
+  const finish=await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,froth:s.scene.getObjectByName('foam-microbubbles').count,spray:s.scene.getObjectByName('offscreen-soap-spray').visible}})
+  expect(finish).toEqual({chapter:1,foam:1,mist:1,froth:18000,spray:false})
+  expect(await identities(page)).toEqual(original)
+  await capture(page,'thick-foam');await healthy(page)
+  await scrollTo(page,.57)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.foam)).toBe(0)
+  expect(await identities(page)).toEqual(original)
+  await healthy(page)
+  expect(errors).toEqual([]);expect(external).toEqual([]);expect(roomHDR).toEqual([])
 })

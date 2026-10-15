@@ -41,7 +41,7 @@ const surfaceGLSL = `
     float pooled=noise21(surfaceUV(p)*5.5);
     float runnel=noise21(vec2((p.x+p.z*.6)*37.,p.y*1.8+uSurfaceTime*.025));
     float vertical=1.-abs(normalize(vSurfaceNormal).y);
-    float coverage=smoothstep(.06,.2,pooled-vertical*smoothstep(.64,.85,runnel)*.13);
+    float coverage=mix(.96,1.,pooled);
     float front=mix(-2.7,2.9,uFoam);
     float deposit=1.-smoothstep(front-.24,front+.24,p.z+(pooled-.5)*.18);
     return coverage*deposit*smoothstep(0.,.06,uFoam);
@@ -50,9 +50,9 @@ const surfaceGLSL = `
     if(uWet<.001 && uFoam<.001)return 0.;
     vec3 p=vSurfacePosition,n=abs(normalize(vSurfaceNormal));
     vec2 uv=n.y>.65?p.xz:n.x>.55?p.zy:p.xy;
-    float beads=uWet>.001?beadHeight(uv*145.)*.00017*uWet*(1.-uFoam):0.;
+    float beads=uWet>.001?(beadHeight(uv*145.)*.00017+pow(noise21(uv*470.),10.)*.00008)*uWet*(1.-uFoam):0.;
     float trails=pow(noise21(vec2((p.x+p.z*.7)*90.,p.y*3.+uSurfaceTime*.16)),16.)*.0003*uWet*(1.-n.y);
-    float lather=uFoam>.001?(foamPores(surfaceUV(p)*340.)*.0008+noise21(surfaceUV(p)*48.)*.0012)*foamCoverage():0.;
+    float lather=uFoam>.001?(foamPores(surfaceUV(p)*260.)*.0016+noise21(surfaceUV(p)*38.)*.0028)*foamCoverage():0.;
     return beads+trails+lather;
   }
   vec3 surfaceBump(vec3 sourceNormal,float height,vec3 viewPosition) {
@@ -68,7 +68,11 @@ export function applySurface(material, uniforms, {foam=true}={}) {
     Object.assign(shader.uniforms,uniforms)
     shader.vertexShader='uniform float uFoam;varying vec3 vSurfacePosition, vSurfaceNormal;\n'+shader.vertexShader
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
-      transformed+=normal*.0025*uFoam;
+      vec3 coatWorld=(modelMatrix*vec4(transformed,1.)).xyz;
+      float coatFront=mix(-2.7,2.9,uFoam);
+      float coatDeposit=(1.-smoothstep(coatFront-.24,coatFront+.24,coatWorld.z))*smoothstep(0.,.06,uFoam);
+      float thickness=.018+.004*sin(coatWorld.x*39.+coatWorld.z*33.)*sin(coatWorld.y*41.-coatWorld.z*27.);
+      transformed+=normal*thickness*coatDeposit;
       vSurfacePosition=(modelMatrix*vec4(transformed,1.)).xyz;
       vSurfaceNormal=normalize(mat3(modelMatrix)*normal);`)
     shader.fragmentShader=surfaceGLSL+shader.fragmentShader
@@ -83,9 +87,9 @@ export function applySurface(material, uniforms, {foam=true}={}) {
       shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
         float latherCoverage=foamCoverage();
         float poreTone=uFoam>.001?foamPores(surfaceUV(vSurfacePosition)*340.):1.;
-        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.76,.83,.88)*mix(.81,1.,poreTone),latherCoverage);`)
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.86,.91,.95)*mix(.9,1.,poreTone),latherCoverage);`)
       shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-        roughnessFactor=mix(roughnessFactor,.64,latherCoverage);`)
+        roughnessFactor=mix(roughnessFactor,.82,latherCoverage);`)
       shader.fragmentShader=shader.fragmentShader.replace('#include <metalnessmap_fragment>',`#include <metalnessmap_fragment>
         metalnessFactor*=1.-latherCoverage;`)
     }

@@ -1,14 +1,13 @@
 # AUREL — live 3D automotive study
 
-A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs three real-time scenes using the same Ferrari model. There is no video playback and no free-look or orbit control.
+A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs one continuous live 3D car showcase. There is no video playback or free-look control.
 
-1. **Ceiling-lit studio / rain:** a continuous overview and straight side-tracking shots, a wide rear arc, then rain building during the inward move and a closer rear-to-front pass. The studio has no walls or ceiling plane. Suspended hexagonal LED fixtures have cylindrical aluminum housings, round diffusers, joined corners, and suspension cables. Rain includes varied streaks, near-camera softness, floor rings, ballistic splashes, surface beads, and layered drifting mist.
-2. **Sprayed soap:** the wet car stays in the dark studio. A pressurized fan enters from off screen and sweeps from front to rear, progressively depositing the lather coat. Fine pores, dense surface froth, gravity trails, and ground suds remain; floating soap bubbles are removed. The spray ends before the final moving hero composition.
-3. **Desert void:** hard sunlight in an uninterrupted sand-colored expanse. The ground fades into a matching background, with no courtyard walls, fins, paving, or visible sky geometry. Dust, controlled glare, and subtle heat shimmer remain.
+1. **Reveal and rain (0–60%):** horizontal side tracks connect to a wide rear arc. Rain, mist, glimmering microbeads, 12,000 geometric beads, and up to 256 surface-following water runners build during the inward move.
+2. **Thick sprayed foam (60–100%):** the camera continues directly into an off-screen soap application. A raised lather blanket, pore relief, 18,000 froth instances, and panel runoff cover the car. No foam pools or ground suds remain. The rain curtain fades out through the soap opening; mist persists after spraying ends.
 
-Brief dips to black cover environment cuts. All three camera paths have continuous velocity and no static scroll holds; the studio side tracks retain their horizontal optical axes. A small shared translation of position and aim keeps the camera moving gently while scroll is idle, without adding free-look or orbit control. Native scrolling remains reversible. Rain and mist begin together during the rear-to-car approach (local studio progress 0.64–0.80).
+The wall-free studio, solid suspended LED hexagons, floor, car, and reflection rig remain mounted throughout. The desert is removed. There is no cut or fade between rain and soap. Camera position, aim, lens, and global velocity match at the join; subtle idle translation keeps the rig moving without orbiting.
 
-In the two studio chapters, an occasional pair of brief light pulses modulates the actual key/fill/rim lights, LED emission, and reflection-environment intensity. The cycle is 15.5 seconds, with pulses separated by 0.95 seconds. Reduced-motion mode disables autonomous camera drift, light pulses, particle motion, and scroll easing while preserving scroll-directed shot navigation.
+Three authored camera moments trigger dramatic lighting failures: a brief flicker, complete blackout, bright overcorrection, undershoot, then recovery. Events finish while scrolling is idle and do not repeat on a timer. Reduced motion disables these failures and autonomous movement. Native scroll remains reversible.
 
 ## Develop
 
@@ -36,18 +35,20 @@ The static production output is `dist/`. URLs assume hosting at the origin root.
 
 This is live WebGL rasterization with physically based materials, HDR/environment reflections, a planar floor reflection, shadow maps, and postprocessing. It does not perform ray tracing or a fluid simulation. The original free demo mesh still limits close-up asset detail. Desktop is the current visual and test priority; mobile has not been optimized or validated for this iteration.
 
-- `src/cinematography.js`: the three chapter ranges, old studio shots, new authored flights, rain timing, and reversible cut fades.
-- `src/Scene.jsx`: one shared model, camera, clock, and effect state. Only the active environment is mounted.
-- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water and foam detail, deterministic surface samples, and instanced beads/froth.
-- `src/Environments.jsx`: instanced hexagon fixtures, reflection capture, wet floor, hard sunlight, seamless desert expanse, and wash chamber.
-- `src/Weather.jsx`: GPU rain, ballistic splashes, off-screen soap spray, layered mist, and sunlit dust. Raindrops fall continuously while stationary unless reduced motion is enabled.
-- `src/Effects.jsx`: HDR bloom, controlled sunlight glare, heat shimmer, tone mapping, antialiasing, and transition fades.
+- `src/cinematography.js`: the two continuous phase ranges, authored camera paths, matching join tangents, and weather timing.
+- `src/Scene.jsx`: one shared model, camera, clock, lighting director, and effect state. The studio remains mounted.
+- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water and thick foam detail, deterministic surface samples, and instanced beads/froth.
+- `src/Environments.jsx`: solid suspended hexagon fixtures, persistent reflection capture, and wet floor.
+- `src/Weather.jsx`: GPU rain, ballistic splashes, off-screen soap spray, persistent layered mist. Raindrops fall continuously while stationary unless reduced motion is enabled.
+- `src/water-runners.js`: pretraced downhill paths on the actual body, using the built-in Three.js Octree.
+- `src/lighting.js`: authored lighting cues and the nonrepeating failure/recovery envelope.
+- `src/Effects.jsx`: HDR bloom, tone mapping, antialiasing, and the lighting-failure blackout shutter.
 
 See [rendering research and tradeoffs](docs/rendering-notes.md) for implementation details, and [studio research and product-showcase flow](docs/showcase-research.md) for the deeper Lusion, Utsubo, Active Theory, and Lumette review. No new model or paid asset was added.
 
 ## Validation
 
-`test:camera` checks the original side-on passes, larger rear distance, camera clearance, continuous new flights, and chapter cuts. `test:smoke` checks the live desktop renderer, all three chapters, rain/droplet visibility, animation at rest, progressive soap application, wall-free studio and modeled LED tubes, approach-timed weather, camera drift, studio light pulses, removed floating bubbles, desert simplicity, backward transitions, no visible interface or free look, no video, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
+`test:camera` checks horizontal tracks, rear clearance, continuously moving paths, exact phase-join position/velocity, rain timing, and authored lighting lifecycle. `test:smoke` checks the desktop renderer, bead/runner counts and movement, persistent object identities across the soap join, pixel-black lighting failure, bright recovery, thick foam, absent ground suds/desert, persistent mist after spraying, reverse scrolling, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
 
 ## Attribution
 

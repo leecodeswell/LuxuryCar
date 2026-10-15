@@ -1,28 +1,30 @@
-import { Suspense, useMemo, useRef, useState } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SHOTS, chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt,cameraDriftAt,studioPulseAt } from './cinematography.js'
+import { SHOTS, chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,cameraDriftAt } from './cinematography.js'
+import {createLightingDirector,advanceLighting} from './lighting.js'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray } from './Weather.jsx'
 import Effects from './Effects.jsx'
 
-function Director({ progress,reducedMotion,state,onChapter }) {
-  const {camera,size}=useThree(),shown=useRef(progress.current),lastChapter=useRef(-1)
+function Director({ progress,reducedMotion,state }) {
+  const {camera,size}=useThree(),shown=useRef(progress.current)
   const target=useMemo(()=>new THREE.Vector3(),[]),targetVector=useMemo(()=>new THREE.Vector3(),[])
   useFrame((_,delta)=>{
     const dt=Math.min(delta,.1)
     shown.current=reducedMotion?progress.current:THREE.MathUtils.damp(shown.current,progress.current,4,dt)
     const chapter=chapterAt(shown.current),shot=shotAt(chapter.local,size.width/size.height,chapter.shots),s=state.current
-    s.chapter=chapter.index;s.local=chapter.local;s.progress=shown.current;s.cut=cutFadeAt(shown.current)
+    s.chapter=chapter.index;s.local=chapter.local;s.progress=shown.current
     const foamTarget=chapter.id==='foam'?foamAt(chapter.local):0
-    const rainTarget=chapter.id==='studio'?rainfallAt(chapter.local):chapter.id==='foam'?1-foamTarget*.8:0
+    const rainTarget=chapter.id==='studio'?rainfallAt(chapter.local):chapter.id==='foam'?1-foamTarget*.4:0
     s.rain=reducedMotion?rainTarget:THREE.MathUtils.damp(s.rain,rainTarget,3.5,dt)
+    const rainCurtain=precipitationAt(shown.current)
+    s.precipitation=reducedMotion?rainCurtain:THREE.MathUtils.damp(s.precipitation??0,rainCurtain,4,dt)
     s.foam=reducedMotion?foamTarget:THREE.MathUtils.damp(s.foam,foamTarget,5,dt)
     s.spray=chapter.id==='foam'?sprayAt(chapter.local):0
     s.time+=reducedMotion?0:dt
-    s.pulse=!reducedMotion && chapter.index<2?studioPulseAt(s.time):0
-    if(lastChapter.current!==chapter.index){lastChapter.current=chapter.index;onChapter(chapter.index)}
+    Object.assign(s,advanceLighting(s.lighting??=createLightingDirector(shown.current),shown.current,dt,reducedMotion))
     camera.position.fromArray(shot.position);target.fromArray(shot.target)
     if(!reducedMotion){const drift=cameraDriftAt(s.time);camera.position.add(targetVector.fromArray(drift));target.add(targetVector)}
     camera.lookAt(target);camera.rotateZ(shot.roll)
@@ -31,17 +33,16 @@ function Director({ progress,reducedMotion,state,onChapter }) {
   return null
 }
 function Experience({ progress,reducedMotion,onReady }) {
-  const [chapter,setChapter]=useState(chapterAt(progress.current).index)
-  const state=useRef({chapter,local:0,progress:0,rain:0,foam:0,spray:0,time:0,pulse:0,cut:0})
+  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,foam:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
     <Suspense fallback={null}>
-      <Environments chapter={chapter} state={state}/>
+      <Environments state={state}/>
       <Car state={state} onReady={onReady}/>
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/>
     </Suspense>
-    <Director progress={progress} reducedMotion={reducedMotion} state={state} onChapter={setChapter}/>
+    <Director progress={progress} reducedMotion={reducedMotion} state={state}/>
     <Effects state={state}/>
   </>
 }

@@ -7,7 +7,7 @@
 html { scrollbar-width: none; }
 html::-webkit-scrollbar { display: none; }
 body { margin: 0; }
-.scroll-space { height: 1650svh; }
+.scroll-space { height: 1400svh; }
 .experience {
   position: fixed;
   inset: 0;
@@ -16,13 +16,6 @@ body { margin: 0; }
 }
 .stage { position: absolute; inset: 0; }
 .stage canvas { display: block; touch-action: pan-y; }
-.cinematic-grade {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 43%, #03060855 100%),
-    linear-gradient(0deg, #04070855, transparent 17%, transparent 85%, #04070844);
-}
 .loading-screen {
   position: absolute;
   inset: 0;

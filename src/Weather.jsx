@@ -17,6 +17,7 @@ function particleGeometry(count,seed,makeSeed) {
   return g
 }
 const colorOutput=`
+gl_FragColor.rgb*=uGain;
 #include <tonemapping_fragment>
 #include <colorspace_fragment>
 `
@@ -28,9 +29,9 @@ float fbm(vec2 p){float n=0.,a=.5;for(int i=0;i<3;i++){n+=noise(p)*a;p=mat2(.8,-
 export function Rain({state}) {
   const mesh=useRef()
   const geometry=useMemo(()=>particleGeometry(9000,508,r=>[(r()-.5)*22,r()*11,(r()-.5)*22,r()]),[])
-  const uniforms=useMemo(()=>({uTime:{value:0},uWet:{value:0}}),[])
+  const uniforms=useMemo(()=>({uTime:{value:0},uWet:{value:0},uGain:{value:1}}),[])
   useEffect(()=>()=>geometry.dispose(),[geometry])
-  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uWet.value=s.rain;mesh.current.visible=s.chapter===0 && s.rain>.003})
+  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;uniforms.uWet.value=s.precipitation;mesh.current.visible=s.precipitation>.003})
   return <mesh ref={mesh} name="rainfall" geometry={geometry} frustumCulled={false}>
     <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
       vertexShader={`attribute vec4 aSeed;uniform float uTime;varying vec2 vUv;varying float vLight,vBlur;
@@ -48,7 +49,8 @@ export function Rain({state}) {
           vLight=(.12+.72*lightPool)*(1.-blocked)*smoothstep(0.,.12,h);
           gl_Position=projectionMatrix*viewMatrix*vec4(world,1.);
         }`}
-      fragmentShader={`uniform float uWet;varying vec2 vUv;varying float vLight,vBlur;
+      fragmentShader={`uniform float uGain;
+uniform float uWet;varying vec2 vUv;varying float vLight,vBlur;
         void main(){float crossSection=exp(-pow((vUv.x-.5)*mix(5.,3.,vBlur),2.));
           float taper=pow(max(0.,sin(vUv.y*3.14159)),.65);
           gl_FragColor=vec4(.66,.79,.88,crossSection*taper*vLight*uWet*mix(.75,.28,vBlur));
@@ -61,9 +63,9 @@ export function GroundImpacts({state}) {
   const rings=useRef(),spray=useRef()
   const geometry=useMemo(()=>particleGeometry(500,951,r=>[(r()-.5)*16,(r()-.5)*16,r(),r()]),[])
   const splashGeometry=useMemo(()=>particleGeometry(1800,952,r=>[(r()-.5)*16,(r()-.5)*16,r(),r()]),[])
-  const uniforms=useMemo(()=>({uTime:{value:0},uWet:{value:0}}),[])
+  const uniforms=useMemo(()=>({uTime:{value:0},uWet:{value:0},uGain:{value:1}}),[])
   useEffect(()=>()=>{geometry.dispose();splashGeometry.dispose()},[geometry,splashGeometry])
-  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uWet.value=s.rain;rings.current.visible=spray.current.visible=s.chapter===0 && s.rain>.003})
+  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;uniforms.uWet.value=s.precipitation;rings.current.visible=spray.current.visible=s.precipitation>.003})
   return <>
     <mesh ref={rings} name="rain-impacts" geometry={geometry} frustumCulled={false}>
       <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
@@ -72,7 +74,8 @@ export function GroundImpacts({state}) {
             vec3 p=vec3(aSeed.x+position.x*scale,.004,aSeed.y+position.y*scale);
             vClear=1.-step(abs(aSeed.x),1.08)*step(abs(aSeed.y),2.3);
             gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`}
-        fragmentShader={`uniform float uWet;varying vec2 vUv;varying float vAge,vClear;
+        fragmentShader={`uniform float uGain;
+uniform float uWet;varying vec2 vUv;varying float vAge,vClear;
           void main(){float r=length(vUv-.5)*2.;float ring=exp(-pow((r-(.2+vAge*.65))/.024,2.));
             float second=exp(-pow((r-(.1+vAge*.4))/.019,2.))*.35;
             gl_FragColor=vec4(.63,.79,.88,(ring+second)*.28*pow(1.-vAge,2.)*uWet*vClear);
@@ -87,7 +90,8 @@ export function GroundImpacts({state}) {
             vAlpha=pow(1.-age,1.7)*step(0.,p.y)*(1.-step(abs(aSeed.x),1.08)*step(abs(aSeed.y),2.3));
             vec4 view=viewMatrix*vec4(p,1.);view.xy+=position.xy*vec2(.008,.014)*(1.+aSeed.w);
             gl_Position=projectionMatrix*view;}`}
-        fragmentShader={`uniform float uWet;varying vec2 vUv;varying float vAlpha;void main(){float d=length(vUv-.5)*2.;gl_FragColor=vec4(.76,.88,.95,exp(-d*d*4.)*vAlpha*uWet*.48);${colorOutput}}`}/>
+        fragmentShader={`uniform float uGain;
+uniform float uWet;varying vec2 vUv;varying float vAlpha;void main(){float d=length(vUv-.5)*2.;gl_FragColor=vec4(.76,.88,.95,exp(-d*d*4.)*vAlpha*uWet*.48);${colorOutput}}`}/>
     </mesh>
   </>
 }
@@ -95,9 +99,9 @@ export function GroundImpacts({state}) {
 export function SoapSpray({state}) {
   const mesh=useRef()
   const geometry=useMemo(()=>particleGeometry(4800,1026,r=>[r(),r(),r(),r()]),[])
-  const uniforms=useMemo(()=>({uTime:{value:0},uSpray:{value:0},uCoverage:{value:0}}),[])
+  const uniforms=useMemo(()=>({uTime:{value:0},uSpray:{value:0},uCoverage:{value:0},uGain:{value:1}}),[])
   useEffect(()=>()=>geometry.dispose(),[geometry])
-  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uSpray.value=s.spray;uniforms.uCoverage.value=s.foam;mesh.current.visible=s.chapter===1 && s.spray>.003})
+  useFrame(()=>{const s=state.current;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;uniforms.uSpray.value=s.spray;uniforms.uCoverage.value=s.foam;mesh.current.visible=s.chapter===1 && s.spray>.003})
   return <group ref={mesh} name="offscreen-soap-spray">
     <mesh name="soap-spray-droplets" geometry={geometry} frustumCulled={false}>
     <shaderMaterial transparent depthWrite={false} uniforms={uniforms} onUpdate={bindUniforms(uniforms)} side={THREE.DoubleSide}
@@ -112,7 +116,8 @@ export function SoapSpray({state}) {
           vec2 along=normalize((viewMatrix*vec4(axis,0.)).xy+vec2(.0001,0.)),across=vec2(-along.y,along.x);
           view.xy+=across*position.x*(.002+aSeed.w*.004)+along*position.y*(.012+aSeed.w*.02);
           gl_Position=projectionMatrix*view;vAlpha=smoothstep(0.,.05,flight)*(1.-smoothstep(.87,1.,flight));}`}
-      fragmentShader={`uniform float uSpray;varying vec2 vUv;varying float vAlpha;
+      fragmentShader={`uniform float uGain;
+uniform float uSpray;varying vec2 vUv;varying float vAlpha;
         void main(){float d=length((vUv-.5)*2.);gl_FragColor=vec4(.84,.91,.97,exp(-d*d*3.7)*vAlpha*uSpray*.48);${colorOutput}}`}/>
     </mesh>
     <mesh name="soap-spray-fan" frustumCulled={false}>
@@ -125,7 +130,8 @@ export function SoapSpray({state}) {
             vec3 axis=normalize(hit-origin),right=normalize(cross(axis,normalize(cameraPosition-center)));
             vec3 p=center+right*(uv.x-.5)*(.035+flight*1.12);
             gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`}
-        fragmentShader={`uniform float uTime,uSpray;varying vec2 vUv;${noise}
+        fragmentShader={`uniform float uGain;
+uniform float uTime,uSpray;varying vec2 vUv;${noise}
           void main(){float lateral=abs(vUv.x*2.-1.);
             float edge=pow(max(0.,1.-lateral*lateral),2.);
             float flow=fbm(vec2(vUv.x*14.,vUv.y*38.-uTime*19.));
@@ -139,27 +145,15 @@ export function SoapSpray({state}) {
 }
 
 export function Atmosphere({state}) {
-  const particles=useRef(),mist=useRef()
-  const geometry=useMemo(()=>{
-    const rng=seededRandom(778),p=new Float32Array(220*3),phase=new Float32Array(220)
-    for(let i=0;i<220;i++){p.set([(rng()-.5)*18,rng()*6,(rng()-.5)*18],i*3);phase[i]=rng()}
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));g.setAttribute('aPhase',new THREE.BufferAttribute(phase,1));return g
-  },[])
+  const mist=useRef()
   const mistGeometry=useMemo(()=>particleGeometry(32,779,r=>[(r()-.5)*16,.16+r()*.6,(r()-.5)*16,r()]),[])
-  const uniforms=useMemo(()=>({uTime:{value:0},uDensity:{value:0}}),[])
-  useEffect(()=>()=>{geometry.dispose();mistGeometry.dispose()},[geometry,mistGeometry])
+  const uniforms=useMemo(()=>({uTime:{value:0},uDensity:{value:0},uGain:{value:1}}),[])
+  useEffect(()=>()=>mistGeometry.dispose(),[mistGeometry])
   useFrame(()=>{
-    const s=state.current;uniforms.uTime.value=s.time;uniforms.uDensity.value=s.chapter===0?s.rain:s.chapter===1?s.spray*.6:0
-    particles.current.visible=s.chapter===2;mist.current.visible=uniforms.uDensity.value>.01
+    const s=state.current;uniforms.uTime.value=s.time;uniforms.uGain.value=s.gain;uniforms.uDensity.value=s.chapter===0?s.rain:1
+    mist.current.visible=uniforms.uDensity.value>.01
   })
   return <>
-    <points ref={particles} name="sunlit-dust" geometry={geometry} frustumCulled={false}>
-      <shaderMaterial transparent depthWrite={false} uniforms={uniforms} onUpdate={bindUniforms(uniforms)} blending={THREE.AdditiveBlending}
-        vertexShader={`attribute float aPhase;uniform float uTime;varying float vAlpha;
-          void main(){vec3 p=position;p.x+=sin(uTime*.09+aPhase*30.)*.22;p.y+=sin(uTime*.12+aPhase*50.)*.15;
-          vec4 view=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*view;gl_PointSize=clamp((.45+aPhase)*28./-view.z,1.,4.);vAlpha=.1+aPhase*.2;}`}
-        fragmentShader={`varying float vAlpha;void main(){float r=length(gl_PointCoord-.5)*2.;gl_FragColor=vec4(1.,.79,.42,exp(-r*r*5.)*vAlpha);}`}/>
-    </points>
     <mesh ref={mist} name="layered-rain-mist" geometry={mistGeometry} frustumCulled={false} renderOrder={3}>
       <shaderMaterial transparent depthWrite={false} side={THREE.DoubleSide} uniforms={uniforms} onUpdate={bindUniforms(uniforms)}
         vertexShader={`attribute vec4 aSeed;uniform float uTime;varying vec2 vUv;varying vec3 vWorld;varying float vPhase;
@@ -167,7 +161,8 @@ export function Atmosphere({state}) {
             vec3 right=normalize(vec3(cameraPosition.z-center.z,0.,center.x-cameraPosition.x));
             vWorld=center+right*position.x*(3.+aSeed.w*3.)+vec3(0,1,0)*position.y*(.7+aSeed.w*.65);
             gl_Position=projectionMatrix*viewMatrix*vec4(vWorld,1.);}`}
-        fragmentShader={`uniform float uTime,uDensity;varying vec2 vUv;varying vec3 vWorld;varying float vPhase;${noise}
+        fragmentShader={`uniform float uGain;
+uniform float uTime,uDensity;varying vec2 vUv;varying vec3 vWorld;varying float vPhase;${noise}
           void main(){vec2 p=(vUv-.5)*2.;float edge=pow(max(0.,1.-dot(p,p)),2.);
             vec2 flow=vec2(vUv.x*4.+uTime*.035+vPhase,vUv.y*3.-uTime*.018);
             float cloud=smoothstep(.2,.72,fbm(flow+vec2(fbm(flow+uTime*.012),0.)));

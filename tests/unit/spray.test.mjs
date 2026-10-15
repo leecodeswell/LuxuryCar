@@ -1,26 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
-import {createSprayContact} from '../../src/spray-contact.js'
+import {createSpraySweep} from '../../src/spray-contact.js'
 import {floorRinseAt,rinseAt,rinseSprayAt} from '../../src/cinematography.js'
 
-test('spray contacts follow a tapered sloping nose instead of an assumed height',()=>{
-  // Narrow front, wider rear, and a low hood reproduce the reported failure.
-  const geometry=new THREE.BufferGeometry()
-  geometry.setAttribute('position',new THREE.Float32BufferAttribute([
-    -.3,.28,-2,1,1,2,.3,.28,-2, -1,1,2,1,1,2,-.3,.28,-2,
-  ],3));geometry.computeVertexNormals()
-  const mesh=new THREE.Mesh(geometry);mesh.updateMatrixWorld(true)
-  const contact=createSprayContact(mesh),origin=new THREE.Vector3(),point=new THREE.Vector3(),normal=new THREE.Vector3(),raycaster=new THREE.Raycaster()
-  for(const reverse of [false,true])for(let i=0;i<=100;i++){
-    assert(contact.trace(i/100,reverse,origin,point,normal))
-    raycaster.set(origin,point.clone().sub(origin).normalize())
-    const hit=raycaster.intersectObject(mesh)[0]
-    assert(hit);assert(hit.point.distanceTo(point)<1e-5)
-    assert(normal.dot(raycaster.ray.direction)<0)
-    if((reverse?1-i/100:i/100)<.08)assert(point.y<.45,'nose splash must stay down on the hood')
+test('wide spray sweep stays continuous across a cabin opening and spans the body',()=>{
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2,1,4));body.position.y=.5;body.updateMatrixWorld(true)
+  const sweep=createSpraySweep(body),origin=new THREE.Vector3(),point=new THREE.Vector3(),normal=new THREE.Vector3()
+  assert(sweep.width>2.7)
+  const path=()=>Array.from({length:1001},(_,i)=>{
+    sweep.trace(i/1000,false,origin,point,normal)
+    assert(point.toArray().every(Number.isFinite));assert.equal(point.x,0)
+    assert(Math.abs(normal.length()-1)<1e-6)
+    return point.clone()
+  })
+  const before=path()
+  // An open cockpit or differently tessellated panels must not alter the rig.
+  body.geometry.dispose();body.geometry=new THREE.PlaneGeometry(.1,.1)
+  const after=path()
+  for(let i=0;i<before.length;i++){
+    assert(before[i].equals(after[i]))
+    if(i)assert(before[i].distanceTo(before[i-1])<.006)
+    sweep.trace(i/1000,true,origin,point,normal)
+    assert(point.distanceTo(before[1000-i])<1e-8)
   }
-  geometry.dispose();mesh.material.dispose()
+  body.geometry.dispose();body.material.dispose()
 })
 test('body rinse finishes before floor wash, with spray present throughout clearing',()=>{
   assert.equal(rinseAt(.56),1);assert.equal(floorRinseAt(.62),0)

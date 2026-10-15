@@ -4,7 +4,7 @@ import { useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import {createSprayContact} from './spray-contact.js'
+import {createSpraySweep} from './spray-contact.js'
 import {createWaterRunners,updateWaterRunners} from './water-runners.js'
 import { applySurface,seededRandom,latherGLSL } from './surface-materials.js'
 
@@ -98,10 +98,10 @@ export default function Car({ state,onReady }) {
         float coverage=latherMask(vLatherWorld);
         diffuseColor.a*=smoothstep(.18,.65,coverage);`)
     }
-    return {sprayPose:{origin:new THREE.Vector3(),point:new THREE.Vector3(),normal:new THREE.Vector3()},sprayContact:createSprayContact(body),model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
+    return {sprayPose:{origin:new THREE.Vector3(),point:new THREE.Vector3(),normal:new THREE.Vector3()},spraySweep:createSpraySweep(body),model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
 
   },[gltf])
-  useEffect(()=>{state.current.sprayContact=items.sprayContact;onReady()},[onReady,state,items])
+  useEffect(()=>{state.current.spraySweep=items.spraySweep;onReady()},[onReady,state,items])
   useEffect(()=>()=>{
     const materials=new Set()
     items.model.traverse(obj=>{if(obj.isMesh)materials.add(obj.material)})
@@ -111,7 +111,7 @@ export default function Car({ state,onReady }) {
     items.dropMaterial.dispose();items.foamMaterial.dispose()
   },[items])
   useFrame(()=>{
-    const s=state.current,pose=items.sprayPose,contact=items.sprayContact
+    const s=state.current,pose=items.sprayPose,contact=items.spraySweep
     if(s.chapter>0){
       pose.valid=contact.trace(s.chapter===2?s.rinse:s.applied,s.chapter===2,pose.origin,pose.point,pose.normal)
       s.sprayPose=pose

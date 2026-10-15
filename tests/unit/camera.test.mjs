@@ -15,13 +15,12 @@ test('studio retains straight horizontal side tracks and a wide moving rear arc'
   assert(a.position[1]>3);assert(b.position[1]>3)
   assert(distance(a.position,b.position)>2)
 })
-test('rain and mist build during the inward camera move, after the wide rear arc',()=>{
-  assert.equal(rainfallAt(.64),0);assert.equal(rainfallAt(.8),1)
+test('rain reveal starts at the same inward camera position, after the wide rear arc',()=>{
+  assert.equal(rainfallAt(.64-1e-6),0);assert.equal(rainfallAt(.64),1);assert.equal(rainfallAt(.8),1)
   let previous=Infinity
   for(let i=0;i<=20;i++){
     const p=.64+i*.16/20,shot=shotAt(p),d=distance(shot.position,shot.target)
     assert(d<previous);previous=d
-    if(i>0)assert(rainfallAt(p)>rainfallAt(p-.008))
   }
 })
 test('each chapter stays outside the body and clear of the floor',()=>{
@@ -88,7 +87,7 @@ test('lighting triggers once per authored crossing, completes while idle, and re
   assert.equal(lightingAt(director.age).gain,1);assert(director.age>90)
   advanceLighting(director,0,.016);advanceLighting(director,LIGHT_CUES[0]+.001,.016);assert.equal(director.age,0)
   assert.deepEqual(advanceLighting(director,.9,.016,true),{gain:1,blackout:0,exposure:1})
-  assert.equal(LIGHT_CUES.length,3);assert(!LIGHT_CUES.includes(.6))
+  assert.equal(LIGHT_CUES.length,1);assert(!LIGHT_CUES.includes(.6))
 })
 
 test('rain curtain fades smoothly into the soap opening without drying the persistent mist',()=>{

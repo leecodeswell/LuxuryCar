@@ -1,5 +1,7 @@
-// Authored camera moments, not a repeating wall-clock flicker.
-export const LIGHT_CUES=[.31,.52,.84]
+import {RAIN_REVEAL_PROGRESS} from './weather-reveal.js'
+
+// One authored weather reveal; no repeating wall-clock flicker.
+export const LIGHT_CUES=[RAIN_REVEAL_PROGRESS]
 const KEYS=[[0,1],[.07,.08],[.14,2.2],[.22,0],[.55,0],[.64,7],[.84,3],[1.04,.2],[1.3,.7],[1.9,1]]
 export function lightingAt(age) {
   if(!Number.isFinite(age) || age<0 || age>=1.9)return {gain:1,blackout:0,exposure:1}
@@ -15,7 +17,7 @@ export function advanceLighting(director,progress,delta,reducedMotion=false) {
   director.age+=delta
   for(let i=0;i<LIGHT_CUES.length;i++){
     const cue=LIGHT_CUES[i]
-    if(progress<cue-.025)director.fired[i]=false
+    if(progress<cue)director.fired[i]=false
     if(director.previous<cue && progress>=cue && !director.fired[i]){
       director.fired[i]=true
       if(!reducedMotion)director.age=0

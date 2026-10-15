@@ -66,8 +66,7 @@ export function shotAt(progress, aspect=16/9, shots=SHOTS) {
   return { position,target,fov:value('fov'),roll:value('roll') }
 }
 export function rainfallAt(progress) {
-  const t=Math.min(1,Math.max(0,(progress-.64)/.16))
-  return t*t*(3-2*t)
+  return progress>=.64?1:0
 }
 export function precipitationAt(progress) {
   const chapter=chapterAt(progress)

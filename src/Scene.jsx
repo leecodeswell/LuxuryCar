@@ -1,7 +1,8 @@
 import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SHOTS, chapterAt,shotAt,rainfallAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,floorRinseAt,cameraDriftAt } from './cinematography.js'
+import { SHOTS, chapterAt,shotAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,floorRinseAt,cameraDriftAt } from './cinematography.js'
+import {createWeatherReveal,advanceWeatherReveal,MIST_DENSITY} from './weather-reveal.js'
 import {createLightingDirector,advanceLighting} from './lighting.js'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
@@ -20,16 +21,18 @@ function Director({ progress,reducedMotion,state }) {
     s.rinse=chapter.id==='rinse'?rinseAt(chapter.local):0
     s.floorRinse=chapter.id==='rinse'?floorRinseAt(chapter.local):0
     s.applied=applied
+    s.time+=reducedMotion?0:dt
+    Object.assign(s,advanceLighting(s.lighting??=createLightingDirector(shown.current),shown.current,dt,reducedMotion))
+    const revealed=advanceWeatherReveal(s.weatherReveal,shown.current,s.blackout,reducedMotion)
+    s.mist=(chapter.index===0?revealed:1)*MIST_DENSITY
     const foamTarget=applied*(1-s.rinse)
-    const rainTarget=chapter.id==='studio'?rainfallAt(chapter.local):1-foamTarget*.25
-    s.rain=reducedMotion?rainTarget:THREE.MathUtils.damp(s.rain,rainTarget,3.5,dt)
-    const rainCurtain=precipitationAt(shown.current)
-    s.precipitation=reducedMotion?rainCurtain:THREE.MathUtils.damp(s.precipitation??0,rainCurtain,4,dt)
+    const rainTarget=chapter.id==='studio'?revealed:1-foamTarget*.25
+    s.rain=reducedMotion || chapter.index===0?rainTarget:THREE.MathUtils.damp(s.rain,rainTarget,3.5,dt)
+    const rainCurtain=chapter.index===0?revealed:precipitationAt(shown.current)
+    s.precipitation=reducedMotion || chapter.index===0?rainCurtain:THREE.MathUtils.damp(s.precipitation??0,rainCurtain,4,dt)
     s.foam=reducedMotion?foamTarget:THREE.MathUtils.damp(s.foam,foamTarget,5,dt)
     s.spray=chapter.id==='foam'?sprayAt(chapter.local):0
     s.rinseSpray=chapter.id==='rinse'?rinseSprayAt(chapter.local):0
-    s.time+=reducedMotion?0:dt
-    Object.assign(s,advanceLighting(s.lighting??=createLightingDirector(shown.current),shown.current,dt,reducedMotion))
     camera.position.fromArray(shot.position);target.fromArray(shot.target)
     if(!reducedMotion){const drift=cameraDriftAt(s.time);camera.position.add(targetVector.fromArray(drift));target.add(targetVector)}
     camera.lookAt(target);camera.rotateZ(shot.roll)
@@ -38,7 +41,7 @@ function Director({ progress,reducedMotion,state }) {
   return null
 }
 function Experience({ progress,reducedMotion,onReady }) {
-  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
+  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>

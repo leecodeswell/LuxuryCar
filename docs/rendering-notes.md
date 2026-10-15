@@ -10,7 +10,7 @@ The studio has no walls or ceiling plane. Twenty-one suspended hexagonal LED fix
 
 ## Authored lighting failures
 
-`src/lighting.js` triggers a recovery envelope when the rendered camera crosses global scroll positions 0.31, 0.52, and 0.84. These are selected rear, wet-detail, and foam moments, not a repeating timer. Each event completes while scrolling is idle; rewinding sufficiently before a cue rearms it for another forward pass. Fast scrolling plays the latest crossed cue rather than queuing a succession of failures.
+`src/lighting.js` triggers a recovery envelope when the rendered camera crosses global scroll position 0.384, the original start of the rainy inward approach. This is one weather-reveal event, not a repeating timer. Rain and denser, taller mist switch from absent to fully present during the complete-blackout portion of the event; they do not fade in through the lit studio. Each event completes while scrolling is idle; rewinding across the onset rearms it for another forward pass. Fast scrolling plays the latest crossed cue rather than queuing a succession of failures.
 
 The envelope briefly flickers, goes completely dark, overshoots to seven times normal illumination, drops below normal, then regulates over 1.9 seconds. Actual LED emission, ambient/key/fill/rim lighting, environment intensity, and weather shading follow the same gain. Exposure briefly rises during the overshoot. A final HDR shutter guarantees full black during the blackout interval, including emissive car parts, mist, rain, and bloom. The additive CSS grade was removed so it cannot tint a black frame. This shutter is unrelated to the soap boundary.
 
@@ -30,7 +30,7 @@ The installed React Three Fiber version copies ShaderMaterial uniform wrappers w
 
 The off-screen fan progressively sweeps from front to rear. The deposited surface raises the exterior by approximately 18 mm, with about 4 mm of lump variation, rough pore relief, and 18,000 surface froth instances. The coat replaces metallic response with opaque, rough white shading and covers glass, wheels, and exterior hardware as well as the body. Panel runoff remains. Five broad irregular runoff regions on the floor carry another 1,800 froth clusters. A spatial floor-wash mask clears both the base pools and these clusters under the floor-directed jets.
 
-The body jet uses a downward surface probe followed by a nozzle-to-panel intersection against a Three.js Octree of the actual body. The first intersected triangle supplies the shared jet endpoint, splash origin, outward normal, and wash-front height/position. The pressure fan narrows at contact and rebound particles have a short lifetime, preventing detached splash clouds over the low nose. The body wash finishes before two floor jets sweep the ground pools. Neither floor nor body foam disappears through a global opacity fade.
+The body jet follows a smooth wash envelope across the full body width. It does not probe triangles or change contact lanes around the open cockpit. The footprint spans 140% of the body width, with a dense particle curtain, broad continuous fan, and distributed short-lived rebound spray. The clearing edge follows the same smooth longitudinal sweep. The body wash finishes before two floor jets sweep the ground pools. Neither floor nor body foam disappears through a global opacity fade.
 
 The coating is procedural and artist-authored. It does not simulate spray collision, viscosity, drainage, bubble collapse, or multiple scattering through real lather.
 

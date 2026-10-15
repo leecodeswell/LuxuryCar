@@ -1,28 +1,14 @@
 import * as THREE from 'three'
-import {Octree} from 'three/addons/math/Octree.js'
-
-// The beam and rebound share the first intersection with the actual body.
-// A downward probe finds a real panel even at the narrow, sloping nose; the
-// nozzle ray then checks for any nearer panel that would intercept the jet.
-export function createSprayContact(body) {
-  const tree=new Octree().fromGraphNode(body),bounds=new THREE.Box3().setFromObject(body)
-  const ray=new THREE.Ray(),probe=new THREE.Vector3(),normal=new THREE.Vector3(),down=new THREE.Vector3(0,-1,0)
-  return {bounds,trace(progress,reverse,origin,point,outNormal){
-    const z=THREE.MathUtils.lerp(bounds.min.z+.045,bounds.max.z-.045,reverse?1-progress:progress)
-    let panel
-    const lanes=[.45,.75,.9,.2,0,1.,-.75]
-    for(let i=0;i<42 && !panel;i++){
-      const inset=Math.floor(i/lanes.length)*.035
-      probe.set(lanes[i%lanes.length],bounds.max.y+2,THREE.MathUtils.lerp(z,(bounds.min.z+bounds.max.z)/2,inset))
-      ray.set(probe,down);panel=tree.rayIntersect(ray)
-    }
-    if(!panel)return false
-    origin.set(7,5.2,panel.position.z-.8)
-    ray.set(origin,normal.subVectors(panel.position,origin).normalize())
-    const hit=tree.rayIntersect(ray)
-    if(!hit)return false
-    point.copy(hit.position);hit.triangle.getNormal(outNormal)
-    if(outNormal.dot(ray.direction)>0)outNormal.negate()
+// A broad wash curtain follows a smooth envelope of the car, not individual
+// panels. Window/cabin openings cannot pull the jet sideways or down inside.
+export function createSpraySweep(body) {
+  const bounds=new THREE.Box3().setFromObject(body),width=bounds.max.x-bounds.min.x
+  return {bounds,width:width*1.4,trace(progress,reverse,origin,point,outNormal){
+    const t=THREE.MathUtils.clamp(reverse?1-progress:progress,0,1)
+    const z=THREE.MathUtils.lerp(bounds.min.z+.045,bounds.max.z-.045,t)
+    const height=THREE.MathUtils.lerp(.5,.93,Math.sin(Math.PI*t)**2)
+    point.set(0,height,z);origin.set(5.8,5.2,z-.8)
+    outNormal.set(.45,.9,0).normalize()
     return true
   }}
 }

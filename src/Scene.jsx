@@ -1,14 +1,13 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Environment, MeshReflectorMaterial, OrbitControls, useGLTF, useTexture } from '@react-three/drei'
+import { Environment, MeshReflectorMaterial, useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
+import { SHOTS, shotAt, rainfallAt } from './cinematography.js'
 
-const COLORS = ['#606965', '#243323', '#57121e']
 const damp = THREE.MathUtils.damp
-const clamp = THREE.MathUtils.clamp
 
-function Car({ finish, weather, onReady }) {
+function Car({ weather, onReady }) {
   const gltf = useGLTF('/models/ferrari.glb', '/draco/')
   const shadow = useTexture('/models/ferrari_ao.png')
   const wet = useRef({ value: 0 })
@@ -16,7 +15,7 @@ function Car({ finish, weather, onReady }) {
     const model = gltf.scene.clone(true)
     model.updateMatrixWorld(true)
     const paint = new THREE.MeshPhysicalMaterial({
-      color: COLORS[0], metalness: 0.88, roughness: 0.23,
+      color: '#606965', metalness: 0.88, roughness: 0.23,
       clearcoat: 1, clearcoatRoughness: 0.065, envMapIntensity: 0.95,
     })
     paint.onBeforeCompile = (shader) => {
@@ -46,7 +45,7 @@ function Car({ finish, weather, onReady }) {
         normal = normalize(abs(det) * normal - grad);
       `)
     }
-    const wheelMaterial = new THREE.MeshStandardMaterial({ color: '#47514c', metalness: 0.9, roughness: 0.22 })
+    const wheelMaterial = new THREE.MeshStandardMaterial({ color: '#333c38', metalness: 0.85, roughness: 0.28, envMapIntensity: 0.55 })
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: '#172123', metalness: 0.2, roughness: 0.055,
       clearcoat: 0.5, transparent: true, opacity: 0.96, envMapIntensity: 0.9,
@@ -57,7 +56,7 @@ function Car({ finish, weather, onReady }) {
       mesh.receiveShadow = true
       if (mesh.name === 'body') mesh.material = paint
       else if (mesh.name === 'glass') mesh.material = glassMaterial
-      else if (/^rim_|^trim$/.test(mesh.name)) mesh.material = wheelMaterial
+      else if (/^rim_|^wheel(?:_\d+)?$/.test(mesh.name)) mesh.material = wheelMaterial
       else {
         mesh.material = mesh.material.clone()
         if (/tire/i.test(mesh.material.name)) {
@@ -112,10 +111,8 @@ function Car({ finish, weather, onReady }) {
       dropMaterial.dispose()
     }
   }, [model, drops, dropMaterial])
-  const nextColor = useMemo(() => new THREE.Color(), [])
   useFrame((_, dt) => {
     wet.current.value = damp(wet.current.value, weather.current, 1.6, dt)
-    paint.color.lerp(nextColor.set(COLORS[finish]), 1 - Math.exp(-dt * 4))
     paint.roughness = THREE.MathUtils.lerp(0.23, 0.13, wet.current.value)
     paint.clearcoatRoughness = THREE.MathUtils.lerp(0.065, 0.035, wet.current.value)
     drops.visible = wet.current.value > 0.02
@@ -200,9 +197,9 @@ function Studio({ weather }) {
       <color attach="background" args={['#0a0d0e']} />
       <fog attach="fog" args={['#0a0d0e', 13, 32]} />
       <ambientLight intensity={0.2} />
-      <spotLight position={[1, 8, -3]} angle={0.8} penumbra={0.8} intensity={110} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0001} />
-      <spotLight position={[-5, 5, 4]} color="#d4e7d4" intensity={100} angle={0.85} penumbra={0.8} />
-      <pointLight position={[4, 3, -4]} color="#dbe2ee" intensity={14} distance={12} />
+      <spotLight position={[1, 8, -3]} angle={0.8} penumbra={0.8} intensity={65} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0001} />
+      <spotLight position={[-5, 5, 4]} color="#d4e7d4" intensity={55} angle={0.85} penumbra={0.8} />
+      <pointLight position={[4, 3, -4]} color="#dbe2ee" intensity={9} distance={12} />
       <Environment files="/environment/studio.hdr" environmentIntensity={0.85} environmentRotation={[0, Math.PI / 4, 0]} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.015, 0]} receiveShadow>
         <planeGeometry args={[90, 90]} />
@@ -228,91 +225,47 @@ function Studio({ weather }) {
   )
 }
 
-const SHOTS = [
-  { p: 0, position: [5.9, 2.1, -6.9], target: [1.3, 0.62, 0.4], fov: 34 },
-  { p: 0.33, position: [4.8, 2.7, -5.8], target: [1.1, 0.65, 0.2], fov: 35 },
-  { p: 0.6667, position: [2.1, 1.8, -3.1], target: [0.65, 0.75, -1.1], fov: 36 },
-  { p: 0.84, position: [5.8, 1.8, 0.5], target: [0.6, 0.6, 1.1], fov: 35 },
-  { p: 1, position: [5.9, 2.1, 6.7], target: [-0.6, 0.6, 1.3], fov: 35 },
-]
-
-function Director({ progress, free, reducedMotion, weather, weatherOverride }) {
+function Director({ progress, reducedMotion, weather }) {
   const { camera, size } = useThree()
   const smoothed = useRef(progress.current)
-  const lookAt = useRef(new THREE.Vector3(...SHOTS[0].target))
-  const point = useMemo(() => new THREE.Vector3(), [])
   const target = useMemo(() => new THREE.Vector3(), [])
-  const pointer = useRef({ x: 0, y: 0 })
-  useEffect(() => {
-    const move = (event) => {
-      pointer.current = { x: (event.clientX / innerWidth - 0.5), y: (event.clientY / innerHeight - 0.5) }
-    }
-    window.addEventListener('pointermove', move)
-    return () => window.removeEventListener('pointermove', move)
-  }, [])
-  useFrame((state, dt) => {
+  useFrame((_, dt) => {
     smoothed.current = reducedMotion ? progress.current : damp(smoothed.current, progress.current, 4, Math.min(dt, 0.25))
     const p = smoothed.current
-    weather.current = weatherOverride === null ? (p > 0.18 && p < 0.86 ? 1 : 0) : Number(weatherOverride)
-    if (free) return
-    let a = SHOTS[0], b = SHOTS[1]
-    for (let i = 0; i < SHOTS.length - 1; i++) {
-      if (p >= SHOTS[i].p) { a = SHOTS[i]; b = SHOTS[i + 1] }
-    }
-    const t = THREE.MathUtils.smootherstep(clamp((p - a.p) / (b.p - a.p), 0, 1), 0, 1)
-    point.fromArray(a.position).lerp(new THREE.Vector3(...b.position), t)
-    target.fromArray(a.target).lerp(new THREE.Vector3(...b.target), t)
-    const mobile = size.width < 768
-    if (mobile) {
-      point.x *= 1.32
-      point.z *= 1.32
-      target.x = 0
-      target.y = 0.55
-    }
-    if (!reducedMotion) {
-      point.x += pointer.current.x * 0.1
-      point.y += pointer.current.y * 0.05 + Math.sin(state.clock.elapsedTime * 0.3) * 0.014
-    }
-    if (reducedMotion) {
-      camera.position.copy(point)
-      lookAt.current.copy(target)
-    } else {
-      camera.position.lerp(point, 1 - Math.exp(-dt * 5))
-      lookAt.current.lerp(target, 1 - Math.exp(-dt * 5))
-    }
-    camera.lookAt(lookAt.current)
-    camera.fov = THREE.MathUtils.lerp(a.fov, b.fov, t) + (mobile ? 13 : 0)
+    const shot = shotAt(p, size.width / size.height)
+    weather.current = rainfallAt(p)
+    camera.position.fromArray(shot.position)
+    camera.lookAt(target.fromArray(shot.target))
+    camera.fov = shot.fov
     camera.updateProjectionMatrix()
-  })
+  }, -1)
   return null
 }
 
-export default function Scene({ progress, finish, free, reducedMotion, weatherOverride, onReady, onUnavailable }) {
+export default function Scene({ progress, reducedMotion, onReady, onUnavailable }) {
   const weather = useRef(0)
   return (
     <Canvas
       shadows
       dpr={[1, 1.75]}
-      camera={{ position: SHOTS[0].position, fov: 35, near: 0.05, far: 100 }}
+      camera={{ position: SHOTS[0].position, fov: SHOTS[0].fov, near: 0.05, far: 100 }}
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance', toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.82 }}
       onCreated={({ gl, scene, camera }) => {
         gl.transmissionResolutionScale = 0.5
         if (import.meta.env.DEV) window.__AUREL_SCENE__ = { scene, camera, gl }
         gl.domElement.addEventListener('webglcontextlost', onUnavailable)
       }}
-      fallback={<WebGLFallback onReady={onReady} />}
+      fallback={<WebGLFallback />}
     >
       <Suspense fallback={null}>
         <Studio weather={weather} />
-        <Car finish={finish} weather={weather} onReady={onReady} />
+        <Car weather={weather} onReady={onReady} />
       </Suspense>
-      <Director progress={progress} free={free} weather={weather} weatherOverride={weatherOverride} reducedMotion={reducedMotion} />
-      {free && <OrbitControls makeDefault target={[0, 0.6, 0]} minDistance={2.5} maxDistance={12} maxPolarAngle={Math.PI / 2 - 0.015} enablePan={false} enableDamping />}
+      <Director progress={progress} weather={weather} reducedMotion={reducedMotion} />
     </Canvas>
   )
 }
 
-function WebGLFallback({ onReady }) {
-  useEffect(onReady, [onReady])
+function WebGLFallback() {
   return <div className="webgl-fallback">Your browser needs WebGL to enter the studio. Try a browser with hardware acceleration enabled.</div>
 }

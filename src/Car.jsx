@@ -9,8 +9,9 @@ import {createWaterRunners,updateWaterRunners} from './water-runners.js'
 import { applySurface,seededRandom,latherGLSL } from './surface-materials.js'
 
 export default function Car({ state,onReady }) {
-  const gltf=useGLTF('/models/ferrari.glb','/draco/')
-  const shadow=useTexture('/models/ferrari_ao.png')
+  const base=import.meta.env.BASE_URL
+  const gltf=useGLTF(`${base}models/ferrari.glb`,`${base}draco/`)
+  const shadow=useTexture(`${base}models/ferrari_ao.png`)
   const items=useMemo(()=>{
     const rng=seededRandom(458), model=gltf.scene.clone(true)
     model.updateMatrixWorld(true)

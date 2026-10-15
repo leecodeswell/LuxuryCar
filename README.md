@@ -30,7 +30,11 @@ npm run test:camera
 npm run test:smoke
 ```
 
-The static production output is `dist/`. URLs assume hosting at the origin root. No credentials, backend, paid service, Blender bake, or external runtime asset request is required. The old render cache is ignored and unused.
+The static production output is `dist/`. Local builds use the origin root; set `VITE_BASE_PATH=/LuxuryCar/` for a repository subpath. Models, textures, and Draco decoders respect Vite's base path. No credentials, backend, paid service, Blender bake, or external runtime asset request is required. The old render cache is ignored and unused.
+
+## GitHub Pages
+
+In repository **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. `.github/workflows/pages.yml` builds and deploys pushes to `main`, using the base path supplied by GitHub Pages. It also supports **Actions → Deploy to GitHub Pages → Run workflow**, including after enabling Pages if the first run failed. The default project URL is https://leecodeswell.github.io/LuxuryCar/.
 
 ## Rendering
 

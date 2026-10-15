@@ -10,7 +10,9 @@ export function strobeAt(progress){return envelope(progress,STROBE_WINDOW)}
 // The mist burns off between flashes and stays gone for the wash.
 export function mistClearAt(progress){return smooth(progress,.562,.594)}
 // Conveyor floor glows through the strobe and carries the car into the wash.
-export function conveyorAt(progress){return envelope(progress,[.53,.552,.6,.64])}
+export function conveyorAt(progress){return smooth(progress,.53,.552)}
+// Broad soft light and a clearer floor reflection support the quiet opener.
+export function introReflectionAt(progress){return 1-smooth(progress,.035,.09)}
 // 7.5 Hz hard flashes with a skipped beat every few so it never feels mechanical.
 export function strobeFlashAt(time){
   const beat=time*7.5,n=Math.floor(beat)
@@ -21,9 +23,9 @@ export function strobeFlashAt(time){
 // Cues are [rise start, full, fall start, off, level]; white foam takes a lower level.
 export const SPOTLIGHTS=[
   {name:'spot-magenta',color:'#ff1a8c',position:[3.8,4.6,-7.2],target:[0,.5,-1.2],intensity:2200,
-    cues:[[-.01,0,.045,.075],[.625,.645,.69,.715,.3],[.955,.975,1.01,1.02]]},
+    cues:[[-.01,0,.035,.075,.14],[.06,.085,.15,.19,.85],[.625,.645,.69,.715,.3],[.955,.975,1.01,1.02]]},
   {name:'spot-cyan',color:'#00e5ff',position:[5.6,4.6,6.6],target:[0,.5,1],intensity:2600,
-    cues:[[-.01,0,.045,.075],[.265,.285,.33,.36],[.725,.745,.79,.815,.3],[.955,.975,1.01,1.02]]},
+    cues:[[-.01,0,.035,.075,.16],[.06,.085,.15,.19,.8],[.265,.285,.33,.36],[.725,.745,.79,.815,.3],[.955,.975,1.01,1.02]]},
   {name:'spot-amber',color:'#ff7a00',position:[6.2,1.3,-3],target:[0,.5,0],intensity:1600,
     cues:[[.41,.43,.49,.52],[.725,.745,.79,.815,.3],[.895,.91,.94,.955,.75],[.955,.975,1.01,1.02]]},
   {name:'spot-violet',color:'#7a2cff',position:[-4.6,6.2,4.2],target:[0,.4,.5],intensity:3000,

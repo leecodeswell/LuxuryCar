@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SPOTLIGHTS, spotlightAt } from './stage-lighting.js'
+import { SPOTLIGHTS, spotlightAt,introReflectionAt } from './stage-lighting.js'
 
 // Four hidden colour spotlights. The lights stay in the scene at zero intensity
 // so their cues never change the light count (and never recompile shaders).
@@ -15,11 +15,19 @@ export default function Spotlights({state}) {
       group.add(light,light.target)
       return light
     })
-    return {group,lights}
+    const fills=[
+      {name:'intro-cyan-softbox',color:'#8edbe9',intensity:12,position:[3,3.5,4],width:5,height:2.5},
+      {name:'intro-neutral-softbox',color:'#eee5e8',intensity:7,position:[-3,3,-3],width:4,height:2.5},
+    ].map(spec=>{
+      const light=new THREE.RectAreaLight(spec.color,0,spec.width,spec.height)
+      light.name=spec.name;light.position.fromArray(spec.position);light.lookAt(0,.5,0);light.userData.baseIntensity=spec.intensity;group.add(light);return light
+    })
+    return {group,lights,fills}
   },[])
-  useEffect(()=>()=>rig.lights.forEach(light=>light.dispose()),[rig])
+  useEffect(()=>()=>[...rig.lights,...rig.fills].forEach(light=>light.dispose()),[rig])
   useFrame(()=>{
     const s=state.current
+    for(const light of rig.fills)light.intensity=light.userData.baseIntensity*introReflectionAt(s.progress)*s.gain*(1-s.blackout)
     for(const light of rig.lights){
       const spec=light.userData.spec,level=spotlightAt(spec,s.progress)*(1-s.blackout)
       light.intensity=spec.intensity*level

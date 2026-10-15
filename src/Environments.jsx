@@ -1,4 +1,6 @@
 import { memo, useEffect, useMemo } from 'react'
+import {createConveyor} from './conveyor.js'
+import {introReflectionAt} from './stage-lighting.js'
 import { useThree } from '@react-three/fiber'
 import { Environment, Lightformer, MeshReflectorMaterial } from '@react-three/drei'
 import * as THREE from 'three'
@@ -65,51 +67,17 @@ function Floor({ state }) {
       shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>','#include <lights_fragment_end>\nreflectedLight.directSpecular *= .008;\nreflectedLight.indirectSpecular *= .04;')
     };material.needsUpdate=true
   },[uniforms])
-  useFrame(()=>{const s=state.current;uniforms.uFloorWet.value=s.rain+s.foam;uniforms.uFloorTime.value=s.time;floor.current.roughness=THREE.MathUtils.lerp(.58,.22,Math.min(1,s.rain+s.foam))})
+  useFrame(()=>{const s=state.current;uniforms.uFloorWet.value=s.rain+s.foam;uniforms.uFloorTime.value=s.time;const intro=introReflectionAt(s.progress);floor.current.roughness=THREE.MathUtils.lerp(THREE.MathUtils.lerp(.58,.22,Math.min(1,s.rain+s.foam)),.34,intro);floor.current.mixStrength=1.25+.65*intro})
   return <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.015,0]} receiveShadow name="studio-reflection-floor">
     <planeGeometry args={[120,120]}/>
     <MeshReflectorMaterial ref={floor} resolution={768} mirror={.3} blur={[180,70]} mixBlur={.68} mixStrength={1.25} roughness={.58} depthScale={.3} minDepthThreshold={.4} maxDepthThreshold={1.8} color="#0a1117" metalness={.18} envMapIntensity={.04}/>
   </mesh>
 }
-// The foam chamber's cyan guide rails and slatted belts, restored as a moving
-// conveyor that glows through the pre-wash strobe.
-const conveyorStrips=[
-  {name:'conveyor-rails',x:0,width:4.26,kind:0},
-  {name:'conveyor-belt-left',x:-2.68,width:.5,kind:1},
-  {name:'conveyor-belt-right',x:2.68,width:.5,kind:1},
-]
 function Conveyor({ state }) {
-  const group=useRef()
-  const uniforms=useMemo(()=>({uTime:{value:0},uGlow:{value:0}}),[])
-  useFrame(()=>{
-    const s=state.current;uniforms.uTime.value=s.time;uniforms.uGlow.value=s.conveyor
-    group.current.visible=s.conveyor>.002
-  })
-  return <group ref={group} name="wash-conveyor" visible={false}>
-    {conveyorStrips.map(strip=><mesh key={strip.name} name={strip.name} position={[strip.x,.006,0]} rotation={[-Math.PI/2,0,0]} renderOrder={2}>
-      <planeGeometry args={[strip.width,18]}/>
-      <shaderMaterial transparent depthWrite={false} blending={THREE.AdditiveBlending} uniforms={uniforms} onUpdate={material=>{material.uniforms=uniforms}}
-        defines={{KIND:strip.kind}}
-        vertexShader={`varying vec2 vLocal;void main(){vLocal=vec2((uv.x-.5)*${strip.width.toFixed(2)},(uv.y-.5)*18.);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`}
-        fragmentShader={`uniform float uTime,uGlow;varying vec2 vLocal;
-          void main(){
-            float z=vLocal.y,travel=z+uTime*1.6,ends=1.-smoothstep(5.5,9.,abs(z));
-            vec3 cyan=vec3(.35,1.5,2.);float light=0.;
-          #if KIND==0
-            float rail=exp(-pow((abs(vLocal.x)-2.1)/.008,2.));
-            float pulse=pow(.5+.5*sin(travel*2.6),6.);
-            float bars=exp(-pow((fract(travel*.42)-.5)/.012,2.))*(1.-smoothstep(1.6,2.1,abs(vLocal.x)));
-            light=rail*(1.4+3.*pulse)+bars*.55;
-          #else
-            float slat=fract(travel*10.);
-            float gap=smoothstep(0.,.06,slat)*(1.-smoothstep(.16,.24,slat));
-            float edge=exp(-pow((abs(vLocal.x)-.22)/.012,2.));
-            light=gap*.9+edge*1.2;
-          #endif
-            gl_FragColor=vec4(cyan*light*uGlow*ends,1.);
-          }`}/>
-    </mesh>)}
-  </group>
+  const rig=useMemo(()=>createConveyor(),[])
+  useEffect(()=>()=>rig.dispose(),[rig])
+  useFrame(()=>{const s=state.current;rig.update(s.time,s.conveyor,s.blackout)})
+  return <primitive object={rig.group}/>
 }
 function Studio({ state }) {
   const ambient=useRef(),key=useRef(),left=useRef(),right=useRef(),rim=useRef()

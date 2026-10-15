@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
-import { Environment, Lightformer, MeshReflectorMaterial, Sky } from '@react-three/drei'
+import { Environment, Lightformer, MeshReflectorMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { useFrame } from '@react-three/fiber'
@@ -15,11 +15,6 @@ for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
 function Hexagons({ capture=false, foam=false }) {
   const mesh=useMemo(()=>{
     const fixtures=ceiling.map(p=>({p,r:[Math.PI/2,0,Math.PI/6]}))
-    for(const side of [-1,1])for(let row=0;row<3;row++)for(let col=-8;col<=8;col++) {
-      const x=col*2.45+(row%2)*1.225,y=2.5+row*2.12
-      fixtures.push({p:[x,y,side*21.8],r:[0,0,Math.PI/6]})
-      fixtures.push({p:[side*21.8,y,x],r:[0,Math.PI/2,Math.PI/6]})
-    }
     const material=new THREE.MeshBasicMaterial({color:foam?'#c3deff':'#dce9ee',toneMapped:false,side:THREE.DoubleSide})
     material.color.multiplyScalar(capture?1.35:2.6)
     const mesh=new THREE.InstancedMesh(new THREE.RingGeometry(1.32,1.365,6),material,fixtures.length),dummy=new THREE.Object3D()
@@ -69,48 +64,36 @@ function Studio({ state,foam }) {
     </>}
   </group>
 }
-function Courtyard() {
-  const stone=useMemo(()=>{
-    const size=128,rng=(()=>{let s=61;return()=>((s=Math.imul(s,1664525)+1013904223)>>>0)/4294967296})(),data=new Uint8Array(size*size*4)
-    for(let i=0;i<size*size;i++){const v=100+Math.floor(rng()*80);data.set([v,v,v,255],i*4)}
-    const texture=new THREE.DataTexture(data,size,size);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(38,38)
-    texture.generateMipmaps=true;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;texture.anisotropy=4;texture.needsUpdate=true
-    return texture
-  },[])
-  useEffect(()=>()=>stone.dispose(),[stone])
-  return <group name="sunlit-mineral-courtyard">
-    <Sky distance={400} sunPosition={SUN_POSITION} turbidity={3.5} rayleigh={1.8} mieCoefficient={.006} mieDirectionalG={.86}/>
-    <hemisphereLight args={['#dceaff','#a38a65',1.7]}/>
+function Desert() {
+  return <group name="sunlit-desert-void">
+    <hemisphereLight args={['#f2e2cb','#b49670',2]}/>
     <directionalLight position={SUN_POSITION} color="#fff1d6" intensity={4.6} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-14} shadow-camera-right={14} shadow-camera-top={14} shadow-camera-bottom={-14} shadow-camera-far={80} shadow-normalBias={.018} shadow-bias={-.0001}/>
-    <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.017,0]} receiveShadow><planeGeometry args={[400,400]}/><meshStandardMaterial color="#c3ae8a" roughness={.88} bumpMap={stone} bumpScale={.012}/></mesh>
-    <mesh position={[0,1.15,0]}><cylinderGeometry args={[16,16,2.4,128,1,true]}/><meshStandardMaterial color="#cdb997" roughness={.84} side={THREE.DoubleSide} bumpMap={stone} bumpScale={.016}/></mesh>
-    {Array.from({length:11},(_,i)=>{
-      const a=-Math.PI*.95+i*.18,h=3.8+Math.sin(i*2.7)*.7
-      return <mesh key={i} name="travertine-fin" position={[11.5*Math.cos(a),h/2,11.5*Math.sin(a)]} rotation={[0,-a,0]} castShadow receiveShadow><boxGeometry args={[.4,h,1.25]}/><meshStandardMaterial color="#cab28e" roughness={.8} bumpMap={stone} bumpScale={.02}/></mesh>
-    })}
-    {Array.from({length:13},(_,i)=><group key={i}>
-      <mesh rotation={[-Math.PI/2,0,0]} position={[(i-6)*2,.0003,0]}><planeGeometry args={[.009,30]}/><meshBasicMaterial color="#8a785d"/></mesh>
-      <mesh rotation={[-Math.PI/2,0,0]} position={[0,.0004,(i-6)*2]}><planeGeometry args={[30,.009]}/><meshBasicMaterial color="#8a785d"/></mesh>
-    </group>)}
+    <mesh name="desert-ground" rotation={[-Math.PI/2,0,0]} position={[0,-.017,0]} receiveShadow>
+      <planeGeometry args={[2000,2000]}/><meshStandardMaterial color="#c9b18b" roughness={.92}/>
+    </mesh>
   </group>
 }
 function Environments({ chapter,state }) {
   const { scene,gl }=useThree()
   useEffect(()=>{
-    scene.background=new THREE.Color(chapter===1?'#e3dac7':'#080e15')
-    scene.fog=chapter===1?new THREE.Fog('#d9cbb0',24,135):new THREE.Fog('#080e15',25,75)
+    scene.background=new THREE.Color(chapter===2?'#d4bc98':'#080e15')
+    scene.fog=chapter===2?new THREE.FogExp2('#d4bc98',.035):new THREE.Fog('#080e15',25,75)
     gl.shadowMap.needsUpdate=true
   },[chapter,scene,gl])
   return <>
-    {chapter===1?<Courtyard/>:<Studio state={state} foam={chapter===2}/>}
-    <Environment key={chapter} frames={1} resolution={256} files={chapter===1?undefined:'/environment/studio.hdr'} environmentIntensity={chapter===1?.85:.42}>
-      {chapter===1?<>
-        <Sky distance={100} sunPosition={SUN_POSITION} turbidity={3.5} rayleigh={1.8} mieCoefficient={.006}/>
+    {chapter===2?<Desert/>:<Studio state={state} foam={chapter===1}/>}
+    <Environment key={chapter} frames={1} resolution={256} files={chapter===2?undefined:'/environment/studio.hdr'} environmentIntensity={chapter===2?.85:.42}>
+      {chapter===2?<>
+        <mesh><sphereGeometry args={[90,32,16]}/><shaderMaterial side={THREE.BackSide}
+          vertexShader={`varying vec3 vDirection;void main(){vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`}
+          fragmentShader={`varying vec3 vDirection;void main(){float elevation=normalize(vDirection).y;vec3 light=mix(vec3(.32,.23,.14),vec3(1.9,1.85,1.75),smoothstep(-.15,.65,elevation));gl_FragColor=vec4(light,1.);}`}/></mesh>
+        <Lightformer position={SUN_POSITION} scale={4} intensity={8} color="#fff0d6" target={[0,0,0]}/>
+        <Lightformer position={[-5,6,-4]} scale={[7,5]} intensity={2} color="#fff7e7" target={[0,0,0]}/>
         <mesh rotation={[-Math.PI/2,0,0]} position={[0,-1,0]}><planeGeometry args={[200,200]}/><meshBasicMaterial color="#b5a17e"/></mesh>
       </>:<>
-        <Hexagons capture foam={chapter===2}/>
+        <Hexagons capture foam={chapter===1}/>
         <Lightformer position={[-5,3,0]} rotation={[0,Math.PI/2,0]} scale={[2,7]} intensity={1.7} color="#d8e8f2"/>
-        <Lightformer position={[5,3,0]} rotation={[0,-Math.PI/2,0]} scale={[2,6]} intensity={1.5} color={chapter===2?'#c7bdff':'#fff0dc'}/>
+        <Lightformer position={[5,3,0]} rotation={[0,-Math.PI/2,0]} scale={[2,6]} intensity={1.5} color={chapter===1?'#c7bdff':'#fff0dc'}/>
       </>}
     </Environment>
   </>

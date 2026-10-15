@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { CHAPTERS,SHOTS,SUN_SHOTS,FOAM_SHOTS,chapterAt,cutFadeAt,shotAt,rainfallAt } from '../../src/cinematography.js'
+import { CHAPTERS,SHOTS,SUN_SHOTS,FOAM_SHOTS,chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt } from '../../src/cinematography.js'
 
 test('original studio keeps the straight side passes and makes the rear view much wider',()=>{
   for(const p of [.2,.35,.79,.95]){
@@ -40,7 +40,16 @@ test('new chapters establish their setting and hold the final product compositio
   }
 })
 test('chapter boundaries are covered by a short reversible fade',()=>{
-  assert.equal(chapterAt(0).shots,SHOTS);assert.equal(chapterAt(.5).id,'sunlight');assert.equal(chapterAt(.9).id,'foam')
+  assert.equal(chapterAt(0).shots,SHOTS);assert.equal(chapterAt(.5).id,'foam');assert.equal(chapterAt(.9).id,'sunlight')
   assert.equal(chapterAt(1).local,1)
   for(const boundary of [.44,.72]){assert.equal(cutFadeAt(boundary),1);assert.equal(cutFadeAt(boundary-.02),0);assert.equal(cutFadeAt(boundary+.02),0)}
+})
+
+test('soap is sprayed onto the car before the final daylight chapter',()=>{
+  assert.deepEqual(CHAPTERS.map(c=>c.id),['studio','foam','sunlight'])
+  assert.equal(foamAt(0),0);assert.equal(sprayAt(0),0)
+  assert.equal(foamAt(.08),0);assert(sprayAt(.08)>.99)
+  assert(foamAt(.35)>0 && foamAt(.35)<1);assert.equal(sprayAt(.35),1)
+  assert.equal(foamAt(.8),1);assert.equal(sprayAt(.8),0)
+  for(let i=1;i<=100;i++)assert(foamAt(i/100)>=foamAt((i-1)/100))
 })

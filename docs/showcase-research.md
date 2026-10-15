@@ -18,8 +18,8 @@ The experience remains a live model and text-free at this stage. The eventual pr
 | Dry horizontal pass | Read the bodywork without distracting orbit | A single verified design or craftsmanship detail |
 | Wide rear and rainfall | Establish scale, then introduce the condition change | Keep the onset largely free of copy; let the weather register |
 | Wet return pass | Show beads, clearcoat response, and changing highlights | One short material detail; avoid unsupported performance claims |
-| Sunlight | Change contrast and reveal the shape under hard daylight | Brief setting introduction during the opening hold; detail text after the move settles |
-| Foam chamber and final hold | Contrast opaque lather with reflective paint, then resolve to a complete car composition | A clean resting point for a later product action; do not imply soap is an automotive feature |
+| Soap application | Follow the rain with a visible off-screen spray and progressive lather deposition in the dark studio | Let the application read before adding copy; do not imply soap is an automotive feature |
+| Desert sunlight and final hold | Reveal the shape under hard daylight against an uninterrupted sand-colored void, then settle | Brief setting introduction during the opening hold; a final product action after the move settles |
 
 The new chapters hold their first pose for 6% of local scroll and their last pose for 8%. The intervening motion eases into and out of continuous paths. Cuts briefly dip to black so an environment swap does not masquerade as a physical camera flight between distant sets. Reverse scrolling restores the previous environment and condition state.
 
@@ -27,4 +27,4 @@ Future copy should be real HTML, use the rendered camera clock, fade before fast
 
 ## Graphics priorities
 
-Material separation, coherent reflection sources, varied particle scales, depth-tested rain, and restrained exposure do more for this model than indiscriminately adding glow. The visible hexagonal fixtures are represented in the reflection environment; water, paint, froth, and thin soap films use different material responses. See [rendering notes](rendering-notes.md) for implementation details and approximations. This is rasterized real-time rendering, not ray tracing or a fluid solver. The original model's geometry and texture quality remain the fidelity ceiling, and software-browser testing cannot establish desktop GPU frame rate.
+Material separation, coherent reflection sources, varied particle scales, depth-tested rain, and restrained exposure do more for this model than indiscriminately adding glow. The visible hexagonal fixtures are represented in the reflection environment; water, paint, and froth use different material responses. See [rendering notes](rendering-notes.md) for implementation details and approximations. This is rasterized real-time rendering, not ray tracing or a fluid solver. The original model's geometry and texture quality remain the fidelity ceiling, and software-browser testing cannot establish desktop GPU frame rate.

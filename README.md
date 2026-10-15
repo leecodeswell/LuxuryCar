@@ -2,9 +2,9 @@
 
 A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs three real-time scenes using the same Ferrari model. There is no video playback and no free-look or orbit control.
 
-1. **Hexagon studio / rain:** the original overview and straight side-tracking shots, a much wider rear pullback, then rain and a closer rear-to-front pass. The rear camera now pulls back to Z = 15.5 instead of 6.5. The room was expanded to keep its walls behind the camera.
-2. **Extreme sunlight:** an open mineral courtyard, analytical daylight sky, hard sunlight and long shadows, pale stone, drifting dust, highlight bloom, lens glare, and restrained ground heat shimmer. The camera starts low at the front quarter, follows the side, then rises around the rear.
-3. **Foam wash chamber:** a return to the cold hexagon-lit room, with a white lather coat, fine pores, raised microbubbles, gravity trails, ground suds, and thin-film soap bubbles. Close detail shots lead to an overhead reveal and wide front-quarter finish.
+1. **Ceiling-lit studio / rain:** the original overview and straight side-tracking shots, a much wider rear pullback, then rain and a closer rear-to-front pass. Hexagonal fixtures remain on the ceiling only; the walls are dark. Rain includes varied streaks, near-camera softness, floor rings, ballistic splashes, surface beads, and layered drifting mist.
+2. **Sprayed soap:** the wet car stays in the dark studio. A pressurized fan enters from off screen and sweeps from front to rear, progressively depositing the lather coat. Fine pores, dense surface froth, gravity trails, and ground suds remain; floating soap bubbles are removed. The spray ends before the final hero hold.
+3. **Desert void:** hard sunlight in an uninterrupted sand-colored expanse. The ground fades into a matching background, with no courtyard walls, fins, paving, or visible sky geometry. Dust, controlled glare, and subtle heat shimmer remain.
 
 Brief dips to black cover the environment cuts. The two new sequences pause at their opening and final compositions, leaving space in the pacing for future product copy. Scroll backward to reverse the entire story. Mouse movement and dragging do not steer the camera. Reduced-motion mode stops autonomous particle movement and removes camera easing while preserving deliberate scroll navigation.
 
@@ -36,16 +36,16 @@ This is live WebGL rasterization with physically based materials, HDR/environmen
 
 - `src/cinematography.js`: the three chapter ranges, old studio shots, new authored flights, rain timing, and reversible cut fades.
 - `src/Scene.jsx`: one shared model, camera, clock, and effect state. Only the active environment is mounted.
-- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water and foam detail, deterministic surface samples, and instanced beads/froth/bubbles.
-- `src/Environments.jsx`: instanced hexagon fixtures, reflection capture, wet floor, analytical daylight, stone courtyard, and wash chamber.
-- `src/Weather.jsx`: GPU rain, floor impact rings, ground mist, and sunlit dust. Raindrops fall continuously while stationary unless reduced motion is enabled.
+- `src/Car.jsx` and `src/surface-materials.js`: physically based paint/glass, world-space water and foam detail, deterministic surface samples, and instanced beads/froth.
+- `src/Environments.jsx`: instanced hexagon fixtures, reflection capture, wet floor, hard sunlight, seamless desert expanse, and wash chamber.
+- `src/Weather.jsx`: GPU rain, ballistic splashes, off-screen soap spray, layered mist, and sunlit dust. Raindrops fall continuously while stationary unless reduced motion is enabled.
 - `src/Effects.jsx`: HDR bloom, controlled sunlight glare, heat shimmer, tone mapping, antialiasing, and transition fades.
 
 See [rendering research and tradeoffs](docs/rendering-notes.md) for implementation details, and [studio research and product-showcase flow](docs/showcase-research.md) for the deeper Lusion, Utsubo, Active Theory, and Lumette review. No new model or paid asset was added.
 
 ## Validation
 
-`test:camera` checks the original side-on passes, larger rear distance, camera clearance, continuous new flights, and chapter cuts. `test:smoke` checks the live desktop renderer, all three chapters, rain/droplet visibility, animation at rest, soap materials, backward transitions, no visible interface or free look, no video, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
+`test:camera` checks the original side-on passes, larger rear distance, camera clearance, continuous new flights, and chapter cuts. `test:smoke` checks the live desktop renderer, all three chapters, rain/droplet visibility, animation at rest, progressive soap application, removed wall fixtures/bubbles, desert simplicity, backward transitions, no visible interface or free look, no video, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
 
 ## Attribution
 

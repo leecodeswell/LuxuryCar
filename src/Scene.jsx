@@ -1,10 +1,10 @@
 import { Suspense, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SHOTS, chapterAt,cutFadeAt,shotAt,rainfallAt } from './cinematography.js'
+import { SHOTS, chapterAt,cutFadeAt,shotAt,rainfallAt,foamAt,sprayAt } from './cinematography.js'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
-import { Rain,GroundImpacts,Atmosphere } from './Weather.jsx'
+import { Rain,GroundImpacts,Atmosphere,SoapSpray } from './Weather.jsx'
 import Effects from './Effects.jsx'
 
 function Director({ progress,reducedMotion,state,onChapter }) {
@@ -15,9 +15,11 @@ function Director({ progress,reducedMotion,state,onChapter }) {
     shown.current=reducedMotion?progress.current:THREE.MathUtils.damp(shown.current,progress.current,4,dt)
     const chapter=chapterAt(shown.current),shot=shotAt(chapter.local,size.width/size.height,chapter.shots),s=state.current
     s.chapter=chapter.index;s.local=chapter.local;s.progress=shown.current;s.cut=cutFadeAt(shown.current)
-    const rainTarget=chapter.index===0?rainfallAt(chapter.local):0,foamTarget=chapter.index===2?1:0
+    const foamTarget=chapter.id==='foam'?foamAt(chapter.local):0
+    const rainTarget=chapter.id==='studio'?rainfallAt(chapter.local):chapter.id==='foam'?1-foamTarget*.8:0
     s.rain=reducedMotion?rainTarget:THREE.MathUtils.damp(s.rain,rainTarget,3.5,dt)
     s.foam=reducedMotion?foamTarget:THREE.MathUtils.damp(s.foam,foamTarget,5,dt)
+    s.spray=chapter.id==='foam'?sprayAt(chapter.local):0
     s.time+=reducedMotion?0:dt
     if(lastChapter.current!==chapter.index){lastChapter.current=chapter.index;onChapter(chapter.index)}
     camera.position.fromArray(shot.position);camera.lookAt(target.fromArray(shot.target));camera.rotateZ(shot.roll)
@@ -27,14 +29,14 @@ function Director({ progress,reducedMotion,state,onChapter }) {
 }
 function Experience({ progress,reducedMotion,onReady }) {
   const [chapter,setChapter]=useState(chapterAt(progress.current).index)
-  const state=useRef({chapter,local:0,progress:0,rain:0,foam:0,time:0,cut:0})
+  const state=useRef({chapter,local:0,progress:0,rain:0,foam:0,spray:0,time:0,cut:0})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
     <Suspense fallback={null}>
       <Environments chapter={chapter} state={state}/>
       <Car state={state} onReady={onReady}/>
-      <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/>
+      <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/>
     </Suspense>
     <Director progress={progress} reducedMotion={reducedMotion} state={state} onChapter={setChapter}/>
     <Effects state={state}/>

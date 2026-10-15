@@ -17,7 +17,7 @@ export const SUN_SHOTS = [
   { p:1, position:[-3.8,5.2,6.1], target:[0,.55,0], fov:40, roll:-.015 },
 ]
 export const FOAM_SHOTS = [
-  { p:0, position:[2.8,1.45,-2.95], target:[.3,.8,-1.05], fov:38, roll:-.018 },
+  { p:0, position:[5,2,-5], target:[0,.7,-.5], fov:38, roll:-.018 },
   { p:.24, position:[2.65,1.1,-.2], target:[.2,.8,-.2], fov:36, roll:0 },
   { p:.48, position:[3.4,1.6,3.6], target:[0,.8,1], fov:38, roll:.02 },
   { p:.72, position:[4.7,4.3,5.1], target:[0,.65,.4], fov:40, roll:.025 },
@@ -25,8 +25,8 @@ export const FOAM_SHOTS = [
 ]
 export const CHAPTERS = [
   { id:'studio', start:0, end:.44, shots:SHOTS },
-  { id:'sunlight', start:.44, end:.72, shots:SUN_SHOTS },
-  { id:'foam', start:.72, end:1, shots:FOAM_SHOTS },
+  { id:'foam', start:.44, end:.72, shots:FOAM_SHOTS },
+  { id:'sunlight', start:.72, end:1, shots:SUN_SHOTS },
 ]
 export function chapterAt(progress) {
   const p=Math.min(1,Math.max(0,progress))
@@ -68,4 +68,12 @@ export function shotAt(progress, aspect=16/9, shots=SHOTS) {
 export function rainfallAt(progress) {
   const t=Math.min(1,Math.max(0,(progress-.58)/.06))
   return t*t*(3-2*t)
+}
+export function foamAt(progress) {
+  const t=Math.min(1,Math.max(0,(progress-.08)/.62))
+  return t*t*(3-2*t)
+}
+export function sprayAt(progress) {
+  const smooth=(a,b)=>{const t=Math.min(1,Math.max(0,(progress-a)/(b-a)));return t*t*(3-2*t)}
+  return smooth(.025,.07)*(1-smooth(.66,.74))
 }

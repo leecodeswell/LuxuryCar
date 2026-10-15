@@ -42,7 +42,9 @@ const surfaceGLSL = `
     float runnel=noise21(vec2((p.x+p.z*.6)*37.,p.y*1.8+uSurfaceTime*.025));
     float vertical=1.-abs(normalize(vSurfaceNormal).y);
     float coverage=smoothstep(.06,.2,pooled-vertical*smoothstep(.64,.85,runnel)*.13);
-    return coverage*uFoam;
+    float front=mix(-2.7,2.9,uFoam);
+    float deposit=1.-smoothstep(front-.24,front+.24,p.z+(pooled-.5)*.18);
+    return coverage*deposit*smoothstep(0.,.06,uFoam);
   }
   float surfaceHeight() {
     if(uWet<.001 && uFoam<.001)return 0.;

@@ -49,9 +49,9 @@ export default function Effects({ state }) {
   },[pipeline])
   useFrame((_,dt)=>{
     const s=state.current
-    gl.toneMappingExposure=s.chapter===1?.82:s.chapter===2?.74:.95
-    pipeline.bloom.strength=s.chapter===1?.16:.18;pipeline.bloom.threshold=s.chapter===1?2:2.4
-    pipeline.lens.uniforms.uTime.value=s.time;pipeline.lens.uniforms.uSun.value=s.chapter===1?1:0;pipeline.lens.uniforms.uCut.value=s.cut
+    gl.toneMappingExposure=s.chapter===2?.82:s.chapter===1?.68:.95
+    pipeline.bloom.strength=s.chapter===2?.16:.18;pipeline.bloom.threshold=s.chapter===2?2:2.4
+    pipeline.lens.uniforms.uTime.value=s.time;pipeline.lens.uniforms.uSun.value=s.chapter===2?1:0;pipeline.lens.uniforms.uCut.value=s.cut
     camera.updateMatrixWorld()
     pipeline.projected.copy(pipeline.sun).normalize().multiplyScalar(100).add(camera.position).project(camera)
     pipeline.lens.uniforms.uSunUV.value.set(pipeline.projected.x*.5+.5,pipeline.projected.y*.5+.5)

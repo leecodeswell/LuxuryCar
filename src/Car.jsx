@@ -58,7 +58,7 @@ export default function Car({ state,onReady }) {
       dummy.position.copy(point).addScaledVector(normal,r*.26);dummy.quaternion.setFromUnitVectors(up,normal);dummy.scale.set(r,r*.5,r);dummy.updateMatrix();drops.setMatrixAt(i,dummy.matrix)
     }
     drops.instanceMatrix.needsUpdate=true
-    const foamMaterial=new THREE.MeshPhysicalMaterial({color:'#d6e3ec',metalness:0,roughness:.57,clearcoat:.18,clearcoatRoughness:.23,envMapIntensity:.6,transparent:true,opacity:0})
+    const foamMaterial=new THREE.MeshPhysicalMaterial({color:'#d6e3ec',metalness:0,roughness:.57,clearcoat:.18,clearcoatRoughness:.23,envMapIntensity:.6,transparent:true,opacity:0,alphaTest:.015})
     const foamGeometry=()=>{
       const geometry=new THREE.IcosahedronGeometry(1,0)
       // Radial normals keep tiny bubbles round without adding more triangles.
@@ -104,19 +104,31 @@ export default function Car({ state,onReady }) {
     const trailGeometry=trails.length?mergeGeometries(trails):new THREE.BufferGeometry()
     trails.forEach(g=>g.dispose())
     const drips=new THREE.Mesh(trailGeometry,foamMaterial);drips.name='soap-runoff';drips.visible=false
-    const bubbleMaterial=new THREE.MeshPhysicalMaterial({color:'#f8fdff',metalness:0,roughness:.025,transmission:1,thickness:.000001,ior:1.04,iridescence:1,iridescenceIOR:1.333,iridescenceThicknessRange:[280,650],transparent:true,opacity:0,envMapIntensity:1.5,depthWrite:false})
-    const bubbles=new THREE.InstancedMesh(new THREE.SphereGeometry(1,12,8),bubbleMaterial,32);bubbles.name='soap-film-bubbles';bubbles.frustumCulled=false;bubbles.visible=false
-    const bubbleSeeds=Array.from({length:32},()=>({x:(rng()-.5)*5,y:.25+rng()*2.2,z:(rng()-.5)*6,r:.018+rng()*.045,phase:rng()*Math.PI*2}))
-    return {model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,ground,pools,poolMaterial,drips,bubbles,bubbleMaterial,bubbleSeeds,dummy}
+    foamMaterial.onBeforeCompile=shader=>{
+      shader.uniforms.uFoam=uniforms.uFoam
+      shader.vertexShader='varying vec3 vLatherWorld;\n'+shader.vertexShader
+      shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+        vec4 latherPosition=vec4(transformed,1.);
+        #ifdef USE_INSTANCING
+          latherPosition=instanceMatrix*latherPosition;
+        #endif
+        vLatherWorld=(modelMatrix*latherPosition).xyz;`)
+      shader.fragmentShader='uniform float uFoam;varying vec3 vLatherWorld;\n'+shader.fragmentShader
+      shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+        float front=mix(-2.7,2.9,uFoam);
+        diffuseColor.a*=(1.-smoothstep(front-.24,front+.24,vLatherWorld.z))*smoothstep(0.,.06,uFoam);`)
+    }
+    return {model,paint,glass,uniforms,drops,dropMaterial,foamMaterial,froth,ground,pools,poolMaterial,drips}
+
   },[gltf])
   useEffect(()=>{onReady()},[onReady])
   useEffect(()=>()=>{
     const materials=new Set()
     items.model.traverse(obj=>{if(obj.isMesh)materials.add(obj.material)})
     materials.forEach(m=>m.dispose())
-    for(const mesh of [items.drops,items.froth,items.ground,items.drips,items.bubbles])mesh.geometry.dispose()
+    for(const mesh of [items.drops,items.froth,items.ground,items.drips])mesh.geometry.dispose()
     items.pools.children.forEach(pool=>pool.geometry.dispose());items.poolMaterial.dispose()
-    items.dropMaterial.dispose();items.foamMaterial.dispose();items.bubbleMaterial.dispose()
+    items.dropMaterial.dispose();items.foamMaterial.dispose()
   },[items])
   useFrame(()=>{
     const s=state.current
@@ -127,16 +139,12 @@ export default function Car({ state,onReady }) {
     items.glass.clearcoat=1-s.foam*.8
     items.glass.transmission=.8*(1-s.foam);items.glass.opacity=1
     items.drops.visible=s.rain>.02;items.dropMaterial.opacity=s.rain*.96
-    items.foamMaterial.opacity=s.foam;items.poolMaterial.opacity=s.foam;items.bubbleMaterial.opacity=s.foam*.7
-    for(const m of [items.froth,items.ground,items.pools,items.drips,items.bubbles])m.visible=s.foam>.01
-    if(s.foam>.01)items.bubbleSeeds.forEach((seed,i)=>{
-      items.dummy.position.set(seed.x+Math.sin(s.time*.2+seed.phase)*.055,seed.y+Math.sin(s.time*.25+seed.phase)*.075,seed.z)
-      items.dummy.quaternion.identity();items.dummy.scale.setScalar(seed.r);items.dummy.updateMatrix();items.bubbles.setMatrixAt(i,items.dummy.matrix)
-    })
-    if(s.foam>.01)items.bubbles.instanceMatrix.needsUpdate=true
+    items.foamMaterial.opacity=1;items.poolMaterial.opacity=s.foam
+    for(const m of [items.froth,items.ground,items.pools,items.drips])m.visible=s.foam>.01
+
   })
   return <group name="hero-car">
-    <primitive object={items.model}/><primitive object={items.drops}/><primitive object={items.froth}/><primitive object={items.ground}/><primitive object={items.pools}/><primitive object={items.drips}/><primitive object={items.bubbles}/>
+    <primitive object={items.model}/><primitive object={items.drops}/><primitive object={items.froth}/><primitive object={items.ground}/><primitive object={items.pools}/><primitive object={items.drips}/>
     <mesh rotation={[-Math.PI/2,0,0]} position={[0,.012,0]} renderOrder={2}>
       <planeGeometry args={[2.62,5.2]}/><meshBasicMaterial map={shadow} transparent blending={THREE.MultiplyBlending} premultipliedAlpha toneMapped={false} depthWrite={false}/>
     </mesh>

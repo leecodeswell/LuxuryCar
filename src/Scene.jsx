@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { SHOTS, chapterAt,shotAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,floorRinseAt,cameraDriftAt } from './cinematography.js'
 import {createWeatherReveal,advanceWeatherReveal,MIST_DENSITY} from './weather-reveal.js'
 import {createLightingDirector,advanceLighting} from './lighting.js'
+import {strobeAt,strobeFlashAt,mistClearAt,conveyorAt} from './stage-lighting.js'
+import Spotlights from './Spotlights.jsx'
 import Car from './Car.jsx'
 import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray,GroundLather } from './Weather.jsx'
@@ -24,7 +26,11 @@ function Director({ progress,reducedMotion,state }) {
     s.time+=reducedMotion?0:dt
     Object.assign(s,advanceLighting(s.lighting??=createLightingDirector(shown.current),shown.current,dt,reducedMotion))
     const revealed=advanceWeatherReveal(s.weatherReveal,shown.current,s.blackout,reducedMotion)
-    s.mist=(chapter.index===0?revealed:1)*MIST_DENSITY
+    // Pre-wash strobe: hard flashes over a near-black room while the mist burns off.
+    s.strobe=strobeAt(shown.current);s.conveyor=conveyorAt(shown.current)
+    s.flash=reducedMotion?0:strobeFlashAt(s.time)*s.strobe
+    s.gain*=reducedMotion?1-.45*s.strobe:THREE.MathUtils.lerp(1,s.flash?2.3:.04,s.strobe)
+    s.mist=(chapter.index===0?revealed*(1-mistClearAt(shown.current)):0)*MIST_DENSITY
     const foamTarget=applied*(1-s.rinse)
     const rainTarget=chapter.id==='studio'?revealed:1-foamTarget*.25
     s.rain=reducedMotion || chapter.index===0?rainTarget:THREE.MathUtils.damp(s.rain,rainTarget,3.5,dt)
@@ -41,7 +47,7 @@ function Director({ progress,reducedMotion,state }) {
   return null
 }
 function Experience({ progress,reducedMotion,onReady }) {
-  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,lighting:createLightingDirector(progress.current)})
+  const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,strobe:0,flash:0,conveyor:0,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
@@ -49,6 +55,7 @@ function Experience({ progress,reducedMotion,onReady }) {
       <Environments state={state}/>
       <Car state={state} onReady={onReady}/>
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
+      <Spotlights state={state}/>
     </Suspense>
     <Director progress={progress} reducedMotion={reducedMotion} state={state}/>
     <Effects state={state}/>

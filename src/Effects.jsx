@@ -14,13 +14,13 @@ export default function Effects({ state }) {
     const composer=new EffectComposer(gl,target),render=new RenderPass(scene,camera)
     const bloom=new UnrealBloomPass(new THREE.Vector2(1,1),.22,.35,1.25)
     const lens=new ShaderPass({
-      uniforms:{tDiffuse:{value:null},uBlackout:{value:0}},
+      uniforms:{tDiffuse:{value:null},uBlackout:{value:0},uFlash:{value:0}},
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:`uniform sampler2D tDiffuse;uniform float uBlackout;varying vec2 vUv;
+      fragmentShader:`uniform sampler2D tDiffuse;uniform float uBlackout,uFlash;varying vec2 vUv;
         void main(){
           vec3 color=texture2D(tDiffuse,vUv).rgb;
           float vignette=1.-dot(vUv-.5,vUv-.5)*.3;
-          gl_FragColor=vec4(color*vignette*(1.-uBlackout),1.);
+          gl_FragColor=vec4(color*vignette*(1.-uBlackout)+vec3(.9,.95,1.)*uFlash*.06,1.);
         }`,
     })
     composer.addPass(render);composer.addPass(bloom);composer.addPass(lens);composer.addPass(new OutputPass())
@@ -36,7 +36,7 @@ export default function Effects({ state }) {
     const s=state.current
     gl.toneMappingExposure=THREE.MathUtils.lerp(.95,.78,s.foam)*s.exposure
     pipeline.bloom.strength=.18;pipeline.bloom.threshold=2.4
-    pipeline.lens.uniforms.uBlackout.value=s.blackout
+    pipeline.lens.uniforms.uBlackout.value=s.blackout;pipeline.lens.uniforms.uFlash.value=s.flash
     camera.updateMatrixWorld()
     gl.info.reset()
     pipeline.composer.render(dt)

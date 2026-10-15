@@ -20,8 +20,8 @@ async function imageStats(page,png){return page.evaluate(async bytes=>{
   bitmap.close();return {max,mean:total/(c.width*c.height*3)}
 },Array.from(png))}
 
-test('continuous wet-to-foam studio, surface water, persistent mist, and authored light failure',async({page})=>{
-  test.setTimeout(600000)
+test('continuous wet-to-foam studio, surface water, strobe-cleared mist, and authored light failure',async({page})=>{
+  test.setTimeout(1200000)
   const errors=[],external=[],roomHDR=[]
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',m=>{if(m.type()==='error'||(m.type()==='warning' && /GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text())))errors.push(m.text())})
@@ -88,19 +88,25 @@ test('continuous wet-to-foam studio, surface water, persistent mist, and authore
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('surface-water').visible)).toBe(true)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('running-water-droplets').visible)).toBe(true)
   await capture(page,'rain-detail');await healthy(page)
+  // Pre-wash strobe: the conveyor floor glows and the mist burns off.
+  await scrollTo(page,.58)
+  expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {strobe:s.state.current.strobe,conveyor:s.scene.getObjectByName('wash-conveyor').visible,mist:s.state.current.mist}})).toMatchObject({strobe:1,conveyor:true})
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.mist)).toBeLessThan(1.7)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('hidden-color-spotlights').children.filter(o=>o.isMesh).length)).toBe(0)
   await scrollTo(page,.6-.00001);const joinBefore=await camera(page)
   await scrollTo(page,.6+.00001);const joinAfter=await camera(page)
   expect(Math.hypot(...joinBefore.map((v,i)=>v-joinAfter[i]))).toBeLessThan(.005)
   expect(await identities(page)).toEqual(original)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.blackout)).toBe(0)
-  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value)).toBe(1.7)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value)).toBe(0)
   await scrollTo(page,.68)
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('spot-magenta').intensity)).toBeGreaterThan(100)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.spray)).toBeGreaterThan(.99)
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('offscreen-soap-spray').visible)).toBe(true)
   await capture(page,'soap-spraying')
   await scrollTo(page,.81)
   const finish=await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,froth:s.scene.getObjectByName('foam-microbubbles').count,spray:s.scene.getObjectByName('offscreen-soap-spray').visible}})
-  expect(finish).toEqual({chapter:1,foam:1,mist:1.7,froth:18000,spray:false})
+  expect(finish).toEqual({chapter:1,foam:1,mist:0,froth:18000,spray:false})
   expect(await identities(page)).toEqual(original)
   await capture(page,'heavy-foam');await healthy(page)
   await scrollTo(page,.82-.00001);const rinseBefore=await camera(page)
@@ -116,7 +122,7 @@ test('continuous wet-to-foam studio, surface water, persistent mist, and authore
   expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {body:s.state.current.rinse,floor:s.state.current.floorRinse,groundVisible:s.scene.getObjectByName('ground-lather').visible,bodySpray:s.scene.getObjectByName('offscreen-rinse-spray').visible,floorSprays:[1,-1].every(i=>s.scene.getObjectByName(`floor-rinse-${i}`).visible)}})).toMatchObject({body:1,groundVisible:true,bodySpray:false,floorSprays:true})
   await capture(page,'floor-wash')
   await scrollTo(page,1)
-  expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,rinse:s.state.current.rinse,wet:s.state.current.rain,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,runners:s.scene.getObjectByName('running-water-droplets').visible,froth:s.scene.getObjectByName('foam-microbubbles').visible,spray:s.scene.getObjectByName('offscreen-rinse-spray').visible}})).toEqual({chapter:2,foam:0,rinse:1,wet:1,mist:1.7,runners:true,froth:false,spray:false})
+  expect(await page.evaluate(()=>{const s=window.__AUREL_SCENE__;return {chapter:s.state.current.chapter,foam:s.state.current.foam,rinse:s.state.current.rinse,wet:s.state.current.rain,mist:s.scene.getObjectByName('layered-rain-mist').material.uniforms.uDensity.value,runners:s.scene.getObjectByName('running-water-droplets').visible,froth:s.scene.getObjectByName('foam-microbubbles').visible,spray:s.scene.getObjectByName('offscreen-rinse-spray').visible}})).toEqual({chapter:2,foam:0,rinse:1,wet:1,mist:0,runners:true,froth:false,spray:false})
   expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('ground-lather').visible)).toBe(false)
   expect(await identities(page)).toEqual(original)
   await capture(page,'rinsed-hero');await healthy(page)

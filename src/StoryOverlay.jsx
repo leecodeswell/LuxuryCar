@@ -56,7 +56,7 @@ export default function StoryOverlay({ progress, displayed, reducedMotion }) {
       </article>)}
     </div>
 
-    <div className="finale-wordmark" aria-hidden="true">AUREL</div>
+    <div className="hero-wordmark" aria-hidden="true">AUREL</div>
     <div className="scroll-hint" aria-hidden="true">Scroll</div>
   </div>
 }

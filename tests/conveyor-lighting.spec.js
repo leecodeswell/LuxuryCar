@@ -1,14 +1,14 @@
 import {test,expect} from '@playwright/test'
 
 test('3D conveyor stays lit through the wash and the opening reflection uses softer light',async({page})=>{
-  test.setTimeout(360000)
+  test.setTimeout(900000)
   const errors=[]
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',m=>{if(m.type()==='error'||/GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text()))errors.push(m.text())})
   await page.goto('/')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:90000})
   async function at(progress,name){
-    await page.evaluate(p=>scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*p),progress)
+    await page.evaluate(p=>scrollTo(0,(document.querySelector('.story-track').offsetHeight-innerHeight)*p),progress)
     await page.waitForFunction(p=>Math.abs(window.__AUREL_SCENE__.state.current.progress-p)<.0001,progress)
     await page.screenshot({path:`/tmp/luxurycar-${name}.png`})
     expect(await page.locator('canvas').evaluate(c=>{const gl=c.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})

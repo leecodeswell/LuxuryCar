@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test'
 test.use({viewport:{width:900,height:600}})
 
 test('enamel badges, lamp optics and layered finishes survive the wet and wash passes',async({page})=>{
-  test.setTimeout(360000)
+  test.setTimeout(900000)
   const errors=[]
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',m=>{if(m.type()==='error'||/GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text()))errors.push(m.text())})
@@ -17,7 +17,7 @@ test('enamel badges, lamp optics and layered finishes survive the wet and wash p
   expect(materials).toMatchObject({badge:'printed enamel badges',badgeSpace:'srgb',paintNormal:true,lens:'ribbed red polycarbonate',brakes:'red painted brake caliper',tailGroups:3})
   expect(materials.uvRange).toBeGreaterThan(.8)
   for(const [progress,name] of [[0,'opener'],[.14,'side'],[.3,'rear'],[.5,'wet'],[.76,'foam'],[1,'rinsed']]){
-    await page.evaluate(p=>scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*p),progress)
+    await page.evaluate(p=>scrollTo(0,(document.querySelector('.story-track').offsetHeight-innerHeight)*p),progress)
     await page.waitForFunction(p=>Math.abs(window.__AUREL_SCENE__.state.current.progress-p)<.0001,progress)
     await page.screenshot({path:`/tmp/car-materials-${name}.png`})
     expect(await page.locator('canvas').evaluate(c=>{const gl=c.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})

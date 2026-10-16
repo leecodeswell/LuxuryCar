@@ -10,6 +10,7 @@ import Car from './Car.jsx'
 import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray,GroundLather } from './Weather.jsx'
 import Effects from './Effects.jsx'
+import HeroTitle from './HeroTitle.jsx'
 
 function Director({ progress,displayed,reducedMotion,state }) {
   const {camera,size}=useThree(),shown=useRef(progress.current)
@@ -55,6 +56,7 @@ function Experience({ progress,displayed,reducedMotion,onReady }) {
     <Suspense fallback={null}>
       <Environments state={state}/>
       <Car state={state} onReady={onReady}/>
+      <HeroTitle state={state} reducedMotion={reducedMotion}/>
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
       <Spotlights state={state}/>
     </Suspense>

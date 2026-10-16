@@ -153,6 +153,8 @@ a { color: inherit; }
 .headline-body { margin: 22px 0 0; max-width: 34ch; font-size: 14px; line-height: 1.55; color: rgba(243, 241, 236, .78); text-shadow: 0 1px 12px rgba(0, 0, 0, .7); }
 
 .hero-wordmark {
+  /* Layout source for HeroTitle's depth-tested lettering in the 3D scene. */
+  visibility: hidden;
   position: absolute; left: 50%; top: 12%; transform: translateX(-50%) var(--skew);
   font: 400 clamp(90px, 22vw, 360px)/.8 var(--display); letter-spacing: -.02em;
   color: transparent; -webkit-text-stroke: 1px rgba(243, 241, 236, .35);

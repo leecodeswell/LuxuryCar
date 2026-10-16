@@ -17,7 +17,7 @@ test('pinned story UI tracks the animation stages, then the site sections take o
   await expect(page.locator('.stage-rail li')).toHaveCount(8)
   await expect(page.locator('.site-nav')).toHaveAttribute('aria-hidden','true')
   await expect(page.locator('.hero-wordmark')).toHaveText('AUREL')
-  await expect(page.locator('.hero-wordmark')).toHaveCSS('opacity','1')
+  await page.waitForFunction(()=>window.__AUREL_SCENE__.scene.getObjectByName('hero-title')?.visible)
   for(const [p,id,gloss] of [[0,'arrival','38'],[.45,'rain',null],[.7,'foam',null],[.9,'rinse',null],[1,'delivery','96']]){
     await story(page,p)
     await expect(page.locator('.story-ui')).toHaveAttribute('data-stage',id)
@@ -25,7 +25,7 @@ test('pinned story UI tracks the animation stages, then the site sections take o
     await expect(page.locator(`#stage-${id}`)).toHaveClass(/is-active/)
     if(gloss)await expect(page.locator('.gauge-value > span')).toHaveText(gloss)
   }
-  await expect(page.locator('.hero-wordmark')).toHaveCSS('opacity','0')
+  await page.waitForFunction(()=>!window.__AUREL_SCENE__.scene.getObjectByName('hero-title')?.visible)
   // The pinned scene stays put while the story plays.
   expect(await page.locator('.experience').evaluate(e=>Math.round(e.getBoundingClientRect().top))).toBe(0)
   await page.locator('#services').scrollIntoViewIfNeeded()

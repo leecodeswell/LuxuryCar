@@ -1,6 +1,15 @@
 # AUREL — live 3D automotive study
 
-A text-free, desktop-focused React/Vite/Three.js experience. Scrolling directs one continuous live 3D car showcase. There is no video playback or free-look control.
+A React/Vite/Three.js site for AUREL, a concept luxury car-detailing atelier, built around one continuous live 3D car-wash showcase. There is no video playback or free-look control.
+
+## Site
+
+The animation plays inside a pinned story section (`.story-track`, 1800svh); the scene itself is unchanged. Story progress is measured on that track only, so the content below never advances the animation, and the canvas stops rendering once the story scrolls away.
+
+- **Persistent UI:** wordmark and tagline top-left, *Book a detail* CTA top-right, a left-rail stage index (click to jump), a gloss-unit gauge with a per-stage readout on the right, and a centre reticle. The overlay follows the camera's damped progress.
+- **Eight stages** matched to the animation: Arrival (0%), Profile (7%), Survey (21%), Rain (38.4%, copy after the blackout), Strobe (54%), Foam (60%), Rinse (82%), Delivery (95.5%). Each has a two-line skewed headline and one line of copy; content lives in `src/site-content.js`.
+- **After the story:** a tilted marquee, six numbered services with prices, process, results, a booking form (concept only: nothing is sent), FAQ and footer. The header nav appears once the story has played.
+- Works at phone widths (compact rail and gauge); `prefers-reduced-motion` removes the overlay transitions, marquee and hint animation alongside the scene's own reduced-motion behaviour. Fonts (Archivo Black, IBM Plex Mono, Manrope) are bundled from Fontsource, so there are still no external runtime requests.
 
 1. **Reveal and rain (0–60%):** horizontal side tracks connect to a wide rear arc. At the original rain onset (38.4% of total scroll), the lights fail. Dense rain, taller layered mist, glimmering microbeads, 12,000 geometric beads, and surface-following water runners switch on under complete blackout and are already present when the lights recover. From 54% to 60% a hard strobe fires over a near-black room while the solid 3D foam-chamber conveyor (metal channels, rounded cyan diffusers, moving slatted belts and raised floor bars) glows underneath and stays lit through the entire foam, body rinse, floor wash and final shot; the mist burns off between flashes and is gone when the wash begins.
 2. **Heavy sprayed foam (60–82%):** off-screen application builds an almost complete raised white coat, with pore relief, panel streaks, and 18,000 froth instances. The glass and wheels are coated too. Five broad, connected runoff regions surround the car, with 1,800 geometric froth clusters on the floor.
@@ -40,7 +49,7 @@ In repository **Settings → Pages → Build and deployment**, select **GitHub A
 
 ## Rendering
 
-This is live WebGL rasterization with physically based materials, HDR/environment reflections, a planar floor reflection, shadow maps, and postprocessing. It does not perform ray tracing or a fluid simulation. The original free demo mesh still limits close-up asset detail. Desktop is the current visual and test priority; mobile has not been optimized or validated for this iteration.
+This is live WebGL rasterization with physically based materials, HDR/environment reflections, a planar floor reflection, shadow maps, and postprocessing. It does not perform ray tracing or a fluid simulation. The original free demo mesh still limits close-up asset detail. The site layout is checked at desktop and phone widths; 3D rendering performance on phones has not been profiled.
 
 - `src/cinematography.js`: the three continuous phase ranges, authored camera paths, matching join tangents, and weather timing.
 - `src/Scene.jsx`: one shared model, camera, clock, lighting director, and effect state. The studio remains mounted.
@@ -59,7 +68,7 @@ See [rendering research and tradeoffs](docs/rendering-notes.md) for implementati
 
 ## Validation
 
-`test:camera` checks horizontal tracks, rear clearance, continuously moving paths, exact phase-join position/velocity, rain timing, and authored lighting lifecycle. `test:smoke` checks the desktop renderer, bead/runner counts and movement, persistent object identities across both joins, pixel-black lighting failure, bright recovery, heavy foam, broad ground pools, body/floor rinse, no desert, strobe-cleared mist and the conveyor reveal, reverse scrolling, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
+`test:camera` checks horizontal tracks, rear clearance, continuously moving paths, exact phase-join position/velocity, rain timing, and authored lighting lifecycle. `test:smoke` checks the site overlay, stage tracking, content sections and phone layout (`tests/site.spec.js`), plus the desktop renderer, bead/runner counts and movement, persistent object identities across both joins, pixel-black lighting failure, bright recovery, heavy foam, broad ground pools, body/floor rinse, no desert, strobe-cleared mist and the conveyor reveal, reverse scrolling, and local-only runtime requests. It uses system Chromium when available; otherwise install Playwright Chromium. Software-rendered graphics checks can take several minutes. Artifacts are under `/tmp/aurel-desktop-*`.
 
 ## Attribution
 

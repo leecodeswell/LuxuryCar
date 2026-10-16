@@ -24,7 +24,7 @@ export function Marquee() {
 function Booking() {
   const [sent,setSent]=useState(false)
   return <section id="book" className="section book">
-    <Heading kicker="Book" plain="Bring it in." accent="We'll take it from here.">One car in the studio at a time. Tell us what you drive and what you want from it, and we'll come back with a slot and a quote.</Heading>
+    <Heading kicker="Book" plain="Bring it in." accent="Leave the rest.">One car in the studio at a time. Tell us what you drive and what you want from it, and we'll come back with a slot and a quote.</Heading>
     {sent
       ?<p className="book-sent" role="status">Thanks. AUREL is a concept studio, so nothing was sent, but this is where we'd confirm your slot.</p>
       :<form className="book-form" onSubmit={e=>{e.preventDefault();setSent(true)}}>

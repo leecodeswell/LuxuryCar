@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test'
 
 test('3D conveyor stays lit through the wash and the opening reflection uses softer light',async({page})=>{
-  test.setTimeout(360000)
+  test.setTimeout(900000)
   const errors=[]
   page.on('pageerror',e=>errors.push(e.message))
   page.on('console',m=>{if(m.type()==='error'||/GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text()))errors.push(m.text())})

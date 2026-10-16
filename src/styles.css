@@ -169,7 +169,7 @@ a { color: inherit; }
 @keyframes hint { 50% { transform: translateY(6px); opacity: .4; } }
 
 /* ---------- Content sections ---------- */
-.site { position: relative; z-index: 1; background: var(--bg); }
+.site { position: relative; z-index: 1; background: var(--bg); overflow-x: clip; }
 .marquee {
   position: relative; z-index: 2; margin: -48px -4vw 0; padding: 14px 0;
   background: var(--accent); color: var(--accent-ink);

@@ -6,7 +6,12 @@ async function scrollTo(page,p){
 async function healthy(page){
   expect(await page.locator('canvas').evaluate(canvas=>{const gl=canvas.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})
 }
-async function capture(page,name){return page.screenshot({path:`/tmp/aurel-desktop-${name}.png`})}
+// Measure the rendered scene only: the site header and story overlay sit above the canvas.
+async function capture(page,name){
+  await page.evaluate(()=>document.documentElement.classList.add('capture-scene'))
+  try{return await page.locator('canvas').screenshot({path:`/tmp/aurel-desktop-${name}.png`})}
+  finally{await page.evaluate(()=>document.documentElement.classList.remove('capture-scene'))}
+}
 async function camera(page){return page.evaluate(()=>window.__AUREL_SCENE__.camera.position.toArray())}
 async function identities(page){return page.evaluate(()=>{const s=window.__AUREL_SCENE__.scene;return ['hero-car','studio-reflection-floor','hexagon-lighting','layered-rain-mist'].map(name=>s.getObjectByName(name).uuid).concat(s.environment.uuid)})}
 async function freezeLighting(page,age){
@@ -27,6 +32,7 @@ test('continuous wet-to-foam studio, surface water, strobe-cleared mist, and aut
   page.on('console',m=>{if(m.type()==='error'||(m.type()==='warning' && /GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text())))errors.push(m.text())})
   page.on('request',r=>{if(r.url().startsWith('http')&&!r.url().startsWith('http://127.0.0.1:3000'))external.push(r.url());if(r.url().includes('/environment/studio.hdr'))roomHDR.push(r.url())})
   await page.goto('/')
+  await page.addStyleTag({content:'.capture-scene .story-ui,.capture-scene .site-header{visibility:hidden!important}'})
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:90000})
   await page.waitForFunction(()=>window.__AUREL_SCENE__?.gl.info.render.triangles>100000)
   // The pinned studio itself stays free of video and controls; site copy lives in the overlay and sections.

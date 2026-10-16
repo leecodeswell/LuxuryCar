@@ -11,7 +11,7 @@ import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray,GroundLather } from './Weather.jsx'
 import Effects from './Effects.jsx'
 
-function Director({ progress,reducedMotion,state }) {
+function Director({ progress,displayed,reducedMotion,state }) {
   const {camera,size}=useThree(),shown=useRef(progress.current)
   const target=useMemo(()=>new THREE.Vector3(),[]),targetVector=useMemo(()=>new THREE.Vector3(),[])
   useFrame((_,delta)=>{
@@ -19,6 +19,7 @@ function Director({ progress,reducedMotion,state }) {
     shown.current=reducedMotion?progress.current:THREE.MathUtils.damp(shown.current,progress.current,4,dt)
     const chapter=chapterAt(shown.current),shot=shotAt(chapter.local,size.width/size.height,chapter.shots),s=state.current
     s.chapter=chapter.index;s.local=chapter.local;s.progress=shown.current
+    if(displayed)displayed.current=shown.current
     const applied=chapter.id==='foam'?foamAt(chapter.local):chapter.id==='rinse'?1:0
     s.rinse=chapter.id==='rinse'?rinseAt(chapter.local):0
     s.floorRinse=chapter.id==='rinse'?floorRinseAt(chapter.local):0
@@ -46,7 +47,7 @@ function Director({ progress,reducedMotion,state }) {
   },-1)
   return null
 }
-function Experience({ progress,reducedMotion,onReady }) {
+function Experience({ progress,displayed,reducedMotion,onReady }) {
   const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,strobe:0,flash:0,conveyor:0,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
@@ -57,12 +58,14 @@ function Experience({ progress,reducedMotion,onReady }) {
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
       <Spotlights state={state}/>
     </Suspense>
-    <Director progress={progress} reducedMotion={reducedMotion} state={state}/>
+    <Director progress={progress} displayed={displayed} reducedMotion={reducedMotion} state={state}/>
     <Effects state={state}/>
   </>
 }
-export default function Scene({progress,reducedMotion,onReady,onUnavailable}) {
+export default function Scene({progress,displayed,active=true,reducedMotion,onReady,onUnavailable}) {
+  // Rendering pauses once the pinned story has scrolled out of view.
   return <Canvas
+    frameloop={active?'always':'never'}
     shadows dpr={[1,1.5]}
     camera={{position:SHOTS[0].position,fov:SHOTS[0].fov,near:.05,far:500}}
     gl={{antialias:false,alpha:false,powerPreference:'high-performance',toneMapping:THREE.ACESFilmicToneMapping,toneMappingExposure:.95}}
@@ -72,5 +75,5 @@ export default function Scene({progress,reducedMotion,onReady,onUnavailable}) {
       gl.domElement.addEventListener('webglcontextlost',onUnavailable)
     }}
     fallback={<div className="webgl-fallback">Enable WebGL to enter the studio.</div>}
-  ><Experience progress={progress} reducedMotion={reducedMotion} onReady={onReady}/></Canvas>
+  ><Experience progress={progress} displayed={displayed} reducedMotion={reducedMotion} onReady={onReady}/></Canvas>
 }

@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test'
 async function scrollTo(page,p){
-  await page.evaluate(v=>window.scrollTo({top:(document.documentElement.scrollHeight-innerHeight)*v,behavior:'instant'}),p)
+  await page.evaluate(v=>window.scrollTo({top:(document.querySelector('.story-track').offsetHeight-innerHeight)*v,behavior:'instant'}),p)
   await page.waitForFunction(v=>Math.abs(window.__AUREL_SCENE__?.state.current.progress-v)<.0001,p)
 }
 async function healthy(page){
@@ -29,8 +29,9 @@ test('continuous wet-to-foam studio, surface water, strobe-cleared mist, and aut
   await page.goto('/')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:90000})
   await page.waitForFunction(()=>window.__AUREL_SCENE__?.gl.info.render.triangles>100000)
-  await expect(page.locator('video,button,nav,header,footer,h1')).toHaveCount(0)
-  expect(await page.locator('main').evaluate(main=>{const copy=main.cloneNode(true);copy.querySelectorAll('canvas').forEach(c=>c.remove());return copy.textContent.trim()})).toBe('')
+  // The pinned studio itself stays free of video and controls; site copy lives in the overlay and sections.
+  await expect(page.locator('video,.stage button,.stage nav')).toHaveCount(0)
+  expect(await page.locator('.stage').evaluate(stage=>{const copy=stage.cloneNode(true);copy.querySelectorAll('canvas').forEach(c=>c.remove());return copy.textContent.trim()})).toBe('')
   expect(errors).toEqual([])
   const traced=await page.evaluate(()=>{
     const s=window.__AUREL_SCENE__,contact=s.state.current.spraySweep,origin=s.camera.position.clone(),point=origin.clone(),normal=origin.clone(),misses=[]

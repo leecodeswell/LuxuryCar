@@ -18,7 +18,7 @@ test('reverse optics and solid LED guides render dry, under foam and after rinse
   expect(optics.reverse).toBe('clear reverse lamp optics');expect(optics.faces).toBeGreaterThan(1000)
   expect(optics.guides).toEqual(['TorusGeometry','TorusGeometry'])
   for(const [progress,name] of [[0,'dry'],[.76,'foam'],[1,'rinsed']]){
-    await page.evaluate(p=>scrollTo(0,(document.documentElement.scrollHeight-innerHeight)*p),progress)
+    await page.evaluate(p=>scrollTo(0,(document.querySelector('.story-track').offsetHeight-innerHeight)*p),progress)
     await page.waitForFunction(p=>Math.abs(window.__AUREL_SCENE__.state.current.progress-p)<.0001,progress)
     await page.screenshot({path:`/tmp/car-optics-${name}.png`})
     expect(await page.locator('canvas').evaluate(c=>{const gl=c.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})

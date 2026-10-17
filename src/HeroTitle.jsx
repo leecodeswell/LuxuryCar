@@ -2,6 +2,7 @@ import {useEffect,useMemo,useRef,useState} from 'react'
 import {useFrame,useThree} from '@react-three/fiber'
 import * as THREE from 'three'
 import {STAGES} from './site-content.js'
+import {titleTextureRatio} from './render-budget.js'
 
 // Rasterize the existing typography, including its CSS skew and responsive
 // layout. The visible title lives in the scene, where the car can occlude it.
@@ -23,7 +24,7 @@ export default function HeroTitle({state,reducedMotion}) {
       if(cancelled)return
       const element=document.querySelector('.hero-wordmark')
       if(!element)return
-      const style=getComputedStyle(element),ratio=Math.min(2,gl.getPixelRatio()*2)
+      const style=getComputedStyle(element),ratio=titleTextureRatio(size.width,size.height,gl.getPixelRatio())
       const canvas=document.createElement('canvas')
       canvas.width=Math.ceil(size.width*ratio);canvas.height=Math.ceil(size.height*ratio)
       const ctx=canvas.getContext('2d'),matrix=new DOMMatrix(style.transform)

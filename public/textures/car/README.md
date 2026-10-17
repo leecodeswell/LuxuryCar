@@ -1,6 +1,9 @@
 # Car surface assets
 
 Generated with `scripts/build-car-textures.py` and `scripts/rasterize-car-badges.mjs`.
+Run `scripts/optimize-car-textures.py` afterwards to generate the lossless WebP
+files used by the browser. PNGs remain authoring sources. Paint, leather and
+rubber grain now render procedurally instead of downloading their noise maps.
 The horse in `horse-source.svg` comes from Simple Icons, Ferrari icon:
 https://github.com/simple-icons/simple-icons/blob/develop/icons/ferrari.svg
 Source brand URL: https://www.ferrari.com

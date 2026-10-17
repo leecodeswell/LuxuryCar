@@ -1,30 +1,27 @@
 import * as THREE from 'three'
-import {Octree} from 'three/addons/math/Octree.js'
 
-// Trace short gravity paths against the actual body once, rather than sliding
-// particles through a guessed car-shaped box. No raycasts run in the frame loop.
-export function createWaterRunners(body,sample,rng,material,count=256) {
-  const tree=new Octree().fromGraphNode(body),bounds=new THREE.Box3().setFromObject(body)
-  const paths=[],ray=new THREE.Ray(),normal=new THREE.Vector3()
-  for(let attempt=0;attempt<count*12 && paths.length<count;attempt++){
-    const seed=sample()
-    if(seed.point.y<.4 || Math.max(Math.abs(seed.normal.x),Math.abs(seed.normal.z))<.6)continue
-    const axis=Math.abs(seed.normal.x)>Math.abs(seed.normal.z)?'x':'z',cross=axis==='x'?'z':'x',sign=Math.sign(seed.normal[axis])
-    const length=.15+rng()*.25,phase=rng()*6.283185,points=[],normals=[]
-    for(let i=0;i<12;i++){
-      const t=i/11
-      ray.origin.copy(seed.point);ray.origin.y-=length*t;ray.origin[cross]+=Math.sin(t*2+phase)*.008
-      ray.origin[axis]=sign>0?bounds.max[axis]+.5:bounds.min[axis]-.5
-      ray.direction.set(0,0,0);ray.direction[axis]=-sign
-      const hit=tree.rayIntersect(ray)
-      if(!hit || hit.position.y<.13)break
-      hit.triangle.getNormal(normal)
-      if(points.length && hit.position.distanceTo(points.at(-1))>.085)break
-      points.push(hit.position.clone().addScaledVector(normal,.0018));normals.push(normal.clone())
+// Paths are traced against the real mesh at build time. Quantization is 0.1 mm.
+export function decodeWaterPaths(buffer) {
+  const view=new DataView(buffer)
+  if(view.getUint32(0,true)!==0x31525741)throw new Error('Invalid water path asset')
+  const count=view.getUint16(4,true),paths=[]
+  let offset=44
+  for(let i=0;i<count;i++){
+    const length=view.getUint8(offset),phase=view.getFloat32(offset+4,true),speed=view.getFloat32(offset+8,true),radius=view.getFloat32(offset+12,true)
+    offset+=16
+    const points=[],normals=[]
+    for(let j=0;j<length;j++){
+      points.push(new THREE.Vector3(...[0,2,4].map(n=>view.getInt16(offset+n,true)/10000)))
+      normals.push(new THREE.Vector3(...[6,8,10].map(n=>view.getInt16(offset+n,true)/32767)).normalize());offset+=12
     }
-    if(points.length<5)continue
-    paths.push({curve:new THREE.CatmullRomCurve3(points,false,'centripetal'),normals,phase:rng(),speed:.05+rng()*.05,radius:.0025+rng()*.0035})
+    paths.push({curve:new THREE.CatmullRomCurve3(points,false,'centripetal'),normals,phase,speed,radius})
   }
+  return {paths,randomDraws:view.getUint32(8,true)}
+}
+export function createWaterRunners(data,rng,material) {
+  const {paths,randomDraws}=decodeWaterPaths(data)
+  // Keep foam sampling identical to the original stream after path generation.
+  for(let i=0;i<randomDraws;i++)rng()
   const mesh=new THREE.InstancedMesh(new THREE.SphereGeometry(1,6,4),material,paths.length)
   mesh.name='running-water-droplets';mesh.frustumCulled=false;mesh.visible=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   mesh.userData.surfacePaths=paths.map(path=>path.curve.points.map(point=>point.toArray()))

@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useRef } from 'react'
+import { Suspense,useCallback,useLayoutEffect,useMemo,useRef,useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SHOTS, chapterAt,shotAt,precipitationAt,foamAt,sprayAt,rinseAt,rinseSprayAt,floorRinseAt,cameraDriftAt } from './cinematography.js'
@@ -11,6 +11,20 @@ import Environments from './Environments.jsx'
 import { Rain,GroundImpacts,Atmosphere,SoapSpray,GroundLather } from './Weather.jsx'
 import Effects from './Effects.jsx'
 import HeroTitle from './HeroTitle.jsx'
+import {renderDpr} from './render-budget.js'
+
+function RenderBudget() {
+  const {size,get}=useThree()
+  useLayoutEffect(()=>{
+    const update=()=>{
+      const {size,viewport,setDpr}=get(),next=renderDpr(size.width,size.height,devicePixelRatio)
+      if(Math.abs(viewport.dpr-next)>.0001)setDpr(next)
+    }
+    update();addEventListener('resize',update)
+    return ()=>removeEventListener('resize',update)
+  },[size.width,size.height,get])
+  return null
+}
 
 function Director({ progress,displayed,reducedMotion,state }) {
   const {camera,size}=useThree(),shown=useRef(progress.current)
@@ -48,34 +62,44 @@ function Director({ progress,displayed,reducedMotion,state }) {
   },-1)
   return null
 }
-function Experience({ progress,displayed,reducedMotion,onReady,paintColor }) {
+function Experience({ progress,displayed,reducedMotion,onReady,onPrepared,onPhase,onUnavailable,paintColor }) {
+  const [assetsReady,setAssetsReady]=useState(false)
+  const markAssetsReady=useCallback(()=>setAssetsReady(true),[])
   const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,strobe:0,flash:0,conveyor:0,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
+    <RenderBudget/>
     <Suspense fallback={null}>
       <Environments state={state}/>
-      <Car state={state} onReady={onReady} paintColor={paintColor}/>
+      <Car state={state} onAssetsReady={markAssetsReady} paintColor={paintColor}/>
       <HeroTitle state={state} reducedMotion={reducedMotion}/>
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
       <Spotlights state={state}/>
     </Suspense>
     <Director progress={progress} displayed={displayed} reducedMotion={reducedMotion} state={state}/>
-    <Effects state={state}/>
+    <Effects state={state} assetsReady={assetsReady} onReady={onReady} onPrepared={onPrepared} onPhase={onPhase} onUnavailable={onUnavailable}/>
   </>
 }
-export default function Scene({progress,displayed,active=true,reducedMotion,onReady,onUnavailable,paintColor}) {
-  // Rendering pauses once the pinned story has scrolled out of view.
+export default function Scene({progress,displayed,active=true,reducedMotion,onReady,onUnavailable,onPhase,paintColor}) {
+  const [prepared,setPrepared]=useState(false)
+  const markPrepared=useCallback(()=>setPrepared(true),[])
+  // Warm shaders before any reflection/main render. Startup is allowed to
+  // finish even if the user skips the hero or restores a scrolled position.
   return <Canvas
-    frameloop={active?'always':'never'}
-    shadows dpr={[1,1.5]}
+    frameloop={prepared&&active?'always':'never'}
+    shadows dpr={renderDpr(innerWidth,innerHeight,devicePixelRatio)}
     camera={{position:SHOTS[0].position,fov:SHOTS[0].fov,near:.05,far:500}}
     gl={{antialias:false,alpha:false,powerPreference:'high-performance',toneMapping:THREE.ACESFilmicToneMapping,toneMappingExposure:.95}}
     onCreated={({gl})=>{
       gl.transmissionResolutionScale=.35;gl.shadowMap.type=THREE.VSMShadowMap;gl.shadowMap.autoUpdate=false;gl.shadowMap.needsUpdate=true
       gl.info.autoReset=false
+      gl.debug.onShaderError=(context,program)=>{
+        console.error('The studio shaders could not be prepared:',context.getProgramInfoLog(program))
+        onUnavailable()
+      }
       gl.domElement.addEventListener('webglcontextlost',onUnavailable)
     }}
     fallback={<div className="webgl-fallback">Enable WebGL to enter the studio.</div>}
-  ><Experience progress={progress} displayed={displayed} reducedMotion={reducedMotion} onReady={onReady} paintColor={paintColor}/></Canvas>
+  ><Experience progress={progress} displayed={displayed} reducedMotion={reducedMotion} onReady={onReady} onPrepared={markPrepared} onPhase={onPhase} onUnavailable={onUnavailable} paintColor={paintColor}/></Canvas>
 }

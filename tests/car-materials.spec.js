@@ -8,13 +8,19 @@ test('enamel badges, lamp optics and layered finishes survive the wet and wash p
   page.on('console',m=>{if(m.type()==='error'||/GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text()))errors.push(m.text())})
   await page.goto('/')
   await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:120000})
+  const paintId=await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('body').material.uuid)
+  await page.getByRole('radio',{name:'Cobalt'}).check()
+  await page.waitForFunction(()=>window.__AUREL_SCENE__.scene.getObjectByName('body').material.color.getHexString()==='175abe')
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.scene.getObjectByName('body').material.uuid)).toBe(paintId)
+  await page.getByRole('radio',{name:'Graphite'}).check()
+  await page.waitForFunction(()=>window.__AUREL_SCENE__.scene.getObjectByName('body').material.color.getHexString()==='424d52')
   const materials=await page.evaluate(()=>{
     const model=window.__AUREL_SCENE__.scene.getObjectByName('hero-car')
     const badge=model.getObjectByName('yellow_trim'),tail=model.getObjectByName('lights_red'),body=model.getObjectByName('body')
     const uv=badge.geometry.attributes.uv.array
-    return {uvRange:Math.max(...uv)-Math.min(...uv),badge:badge.material.name,badgeSpace:badge.material.map.colorSpace,paintNormal:!!body.material.normalMap,lens:tail.material[0].name,tailGroups:tail.geometry.groups.length,brakes:model.getObjectByName('brakes').material.name}
+    return {uvRange:Math.max(...uv)-Math.min(...uv),badge:badge.material.name,badgeSpace:badge.material.map.colorSpace,paintFinish:body.material.userData.surfaceFinish,lens:tail.material[0].name,tailGroups:tail.geometry.groups.length,brakes:model.getObjectByName('brakes').material.name}
   })
-  expect(materials).toMatchObject({badge:'printed enamel badges',badgeSpace:'srgb',paintNormal:true,lens:'ribbed red polycarbonate',brakes:'red painted brake caliper',tailGroups:3})
+  expect(materials).toMatchObject({badge:'printed enamel badges',badgeSpace:'srgb',paintFinish:'paint',lens:'ribbed red polycarbonate',brakes:'red painted brake caliper',tailGroups:3})
   expect(materials.uvRange).toBeGreaterThan(.8)
   for(const [progress,name] of [[0,'opener'],[.14,'side'],[.3,'rear'],[.5,'wet'],[.76,'foam'],[1,'rinsed']]){
     await page.evaluate(p=>scrollTo(0,(document.querySelector('.story-track').offsetHeight-innerHeight)*p),progress)

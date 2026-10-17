@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {applySurface} from './surface-materials.js'
 
-export const carTextureFiles=['badges.png','paint-normal.png','paint-roughness.png','carbon-color.png','carbon-normal.png','leather-normal.png','rubber-normal.png','lens-normal.png','tail-color.png','tail-emission.png']
+export const carTextureFiles=['badges.webp','carbon-color.webp','carbon-normal.webp','lens-normal.webp','tail-color.webp','tail-emission.webp']
 
 // The source badge/lens UVs are all zero. Project each separate badge into its
 // own atlas tile in world coordinates; do not mutate cached useGLTF geometry.
@@ -27,21 +27,21 @@ export function isReverseLens(p) {
 
 export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) {
   const textures=sourceTextures.map(t=>t.clone()),ownedGeometry=[]
-  const [badges,paintNormal,paintRough,carbonColor,carbonNormal,leatherNormal,rubberNormal,lensNormal,tailColor,tailEmission]=textures
+  const [badges,carbonColor,carbonNormal,lensNormal,tailColor,tailEmission]=textures
   textures.forEach(t=>{t.anisotropy=anisotropy;t.needsUpdate=true})
   for(const t of [badges,carbonColor,tailColor,tailEmission])t.colorSpace=THREE.SRGBColorSpace
-  for(const t of [paintNormal,paintRough,carbonColor,carbonNormal,leatherNormal,rubberNormal]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1,1)}
-  const physical=(name,settings,foam=true)=>{
+  for(const t of [carbonColor,carbonNormal]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1,1)}
+  const physical=(name,settings,foam=true,finish='')=>{
     const m=new THREE.MeshPhysicalMaterial(settings);m.name=name
-    return applySurface(m,uniforms,{foam})
+    return applySurface(m,uniforms,{foam,finish})
   }
-  const paint=physical('graphite multilayer clearcoat',{color:'#424d52',metalness:.78,roughness:.27,roughnessMap:paintRough,normalMap:paintNormal,normalScale:new THREE.Vector2(.18,.18),clearcoat:1,clearcoatRoughness:.065,envMapIntensity:.9})
+  const paint=physical('graphite multilayer clearcoat',{color:'#424d52',metalness:.78,roughness:.27,clearcoat:1,clearcoatRoughness:.065,envMapIntensity:.9},true,'paint')
   const glass=physical('automotive laminated glass',{color:'#adbcc3',roughness:.025,transmission:.8,thickness:.008,ior:1.46,clearcoat:1,envMapIntensity:.5})
   const wheel=physical('satin forged alloy',{color:'#252c30',metalness:1,roughness:.28,clearcoat:.35,clearcoatRoughness:.16,envMapIntensity:.65})
   const badge=physical('printed enamel badges',{map:badges,metalness:.12,roughness:.24,clearcoat:1,clearcoatRoughness:.07,ior:1.5,envMapIntensity:.85})
   const carbon=physical('resin coated twill carbon',{map:carbonColor,normalMap:carbonNormal,normalScale:new THREE.Vector2(.3,.3),metalness:.22,roughness:.38,clearcoat:1,clearcoatRoughness:.16,envMapIntensity:.65})
-  const leather=physical('fine leather grain',{color:'#12181b',normalMap:leatherNormal,normalScale:new THREE.Vector2(.24,.24),roughness:.78,sheen:.2,sheenRoughness:.8,sheenColor:'#3c4143'},false)
-  const rubber=physical('moulded tire rubber',{color:'#171a1c',normalMap:rubberNormal,normalScale:new THREE.Vector2(.3,.3),roughness:.86})
+  const leather=physical('fine leather grain',{color:'#12181b',roughness:.78,sheen:.2,sheenRoughness:.8,sheenColor:'#3c4143'},false,'leather')
+  const rubber=physical('moulded tire rubber',{color:'#171a1c',roughness:.86},true,'rubber')
   const chrome=physical('polished emblem and trim',{color:'#b8bec1',metalness:1,roughness:.18,envMapIntensity:1})
   const metal=physical('brushed metal hardware',{color:'#70797f',metalness:1,roughness:.32,envMapIntensity:.7})
   // Lens colour is separate from its annular light guide. A dark centre and
@@ -78,7 +78,7 @@ export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) 
     if(!mesh.isMesh)return
     mesh.castShadow=true;mesh.receiveShadow=true
     const name=mesh.material.name
-    if(mesh.name==='body'){mesh.material=paint;planar(mesh,36)}
+    if(mesh.name==='body')mesh.material=paint
     else if(mesh.name==='glass')mesh.material=glass
     else if(/^rim_|^wheel(?:_\d+)?$/.test(mesh.name))mesh.material=wheel
     else if(name==='Ferrari_Yellow'){
@@ -111,8 +111,8 @@ export function upgradeCarMaterials(model,sourceTextures,uniforms,anisotropy=8) 
     else if(/Taillight/i.test(name))mesh.material=reflector
     else if(/Projector/i.test(name))mesh.material=front
     else if(/carbon/i.test(name)){mesh.material=carbon;planar(mesh,24)}
-    else if(/tire/i.test(name)){mesh.material=rubber;planar(mesh,18)}
-    else if(/leather|interior|carpet/i.test(name)){mesh.material=leather;planar(mesh,14)}
+    else if(/tire/i.test(name))mesh.material=rubber
+    else if(/leather|interior|carpet/i.test(name))mesh.material=leather
     else if(/metal_chrome/i.test(name)){
       mesh.material=[chrome,reverse]
       const g=project(mesh,p=>[(p.x-(p.x<0?-.7758385:.767899))/.1+.5,(p.y-.8754365)/.1+.5])

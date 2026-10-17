@@ -1,0 +1,55 @@
+import {test,expect} from '@playwright/test'
+test.use({viewport:{width:900,height:600}})
+
+function deferred(){let resolve;const promise=new Promise(r=>{resolve=r});return {promise,resolve}}
+
+test('cold startup gives immediate feedback and reveals a rendered car without scrolling',async({page})=>{
+  test.setTimeout(240000)
+  const script=deferred(),car=deferred(),errors=[]
+  page.on('pageerror',e=>errors.push(e.message))
+  page.on('console',m=>{if(m.type()==='error'||/GL_INVALID|Feedback loop|Framebuffer is incomplete/i.test(m.text()))errors.push(m.text())})
+  await page.emulateMedia({reducedMotion:'no-preference'})
+  await page.route('**/src/main.jsx',async route=>{await script.promise;await route.continue()})
+  await page.route('**/models/ferrari.glb',async route=>{await car.promise;await route.continue()})
+  await page.goto('/',{waitUntil:'commit'})
+  await expect(page.locator('#boot-loader')).toBeVisible()
+  await expect(page.locator('#boot-loader')).toContainText('Preparing your studio')
+  script.resolve()
+  await expect(page.locator('.loading-screen')).toBeVisible()
+  await expect(page.locator('.loading-screen')).not.toHaveClass(/loaded/)
+  await expect(page.locator('.loading-screen .loader-ring')).toHaveCSS('animation-name','loader-orbit')
+  await page.screenshot({path:'/tmp/aurel-comfort-loader.png'})
+  car.resolve()
+  await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:150000})
+  await expect(page.locator('.loading-screen')).toHaveCSS('opacity','0',{timeout:30000})
+  expect(await page.evaluate(()=>({scrolled:scrollY,frame:window.__AUREL_SCENE__.state.current.firstFrame,body:!!window.__AUREL_SCENE__.scene.getObjectByName('body')}))).toEqual({scrolled:0,frame:true,body:true})
+  await page.screenshot({path:'/tmp/aurel-cold-start-ready.png'})
+  const bytes=await page.evaluate(()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/textures/car/')).reduce((n,e)=>n+e.decodedBodySize,0))
+  expect(bytes).toBeGreaterThan(0);expect(bytes).toBeLessThan(750000)
+  expect(errors).toEqual([])
+})
+
+test('skipping a loading hero does not pause startup or require scrolling to wake the car',async({page})=>{
+  test.setTimeout(240000)
+  const car=deferred()
+  await page.route('**/models/ferrari.glb',async route=>{await car.promise;await route.continue()})
+  await page.goto('/',{waitUntil:'domcontentloaded'})
+  await page.getByRole('link',{name:'Browse services'}).click()
+  await expect(page.locator('#services')).toBeInViewport()
+  car.resolve()
+  await expect(page.locator('.loading-screen')).toHaveClass(/loaded/,{timeout:150000})
+  expect(await page.evaluate(()=>window.__AUREL_SCENE__.state.current.firstFrame)).toBe(true)
+  await page.locator('.site-header .brand').click()
+  await page.waitForFunction(()=>window.__AUREL_SCENE__.state.current.progress<.0001)
+  await expect(page.locator('.experience')).toHaveAttribute('aria-busy','false')
+  expect(await page.locator('canvas').evaluate(c=>{const gl=c.getContext('webgl2');return {lost:gl.isContextLost(),error:gl.getError()}})).toEqual({lost:false,error:0})
+})
+
+test('failed assets show retry and service links instead of an endless blank screen',async({page})=>{
+  await page.route('**/models/ferrari.glb',route=>route.abort())
+  await page.goto('/')
+  await expect(page.getByRole('button',{name:'Retry studio'})).toBeVisible({timeout:60000})
+  await expect(page.getByRole('alert')).toContainText('couldn’t start')
+  await page.getByRole('link',{name:'Browse services'}).click()
+  await expect(page.locator('#services')).toBeInViewport()
+})

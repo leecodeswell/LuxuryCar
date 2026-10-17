@@ -84,7 +84,8 @@ const surfaceGLSL = `
     return normalize(abs(det)*sourceNormal-gradient);
   }
 `
-export function applySurface(material, uniforms, {foam=true}={}) {
+export function applySurface(material, uniforms, {foam=true,finish=''}={}) {
+  material.userData.surfaceFinish=finish
   material.onBeforeCompile=shader=>{
     Object.assign(shader.uniforms,uniforms)
     shader.vertexShader=latherGLSL+'varying vec3 vSurfacePosition, vSurfaceNormal;\n'+shader.vertexShader
@@ -96,9 +97,17 @@ export function applySurface(material, uniforms, {foam=true}={}) {
       vSurfacePosition=(modelMatrix*vec4(transformed,1.)).xyz;
       vSurfaceNormal=normalize(mat3(modelMatrix)*normal);`)
     shader.fragmentShader=(foam?surfaceGLSL:surfaceGLSL.replace('return latherMask(vSurfacePosition);','return 0.;'))+shader.fragmentShader
+    const grain=finish==='paint'?'noise21(finishUV*1450.)*.000012':finish==='leather'?'noise21(finishUV*520.)*.000035+noise21(finishUV*1400.)*.000018':finish==='rubber'?'noise21(finishUV*1800.)*.000018+sin(finishUV.x*3500.)*.000002':'0.'
+    if(finish)shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+      vec3 finishAxis=abs(normalize(vSurfaceNormal));
+      vec2 finishUV=finishAxis.y>.65?vSurfacePosition.xz:finishAxis.x>.55?vSurfacePosition.zy:vSurfacePosition.xy;
+      float finishFilter=1.-smoothstep(.3,1.2,max(length(dFdx(finishUV)),length(dFdy(finishUV)))*1450.);`)
     shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
       float surfaceRelief=surfaceHeight();
-      normal=surfaceBump(normal,surfaceRelief,-vViewPosition);`)
+      ${finish?`float finishRelief=(${grain})*finishFilter*(1.-foamCoverage())*(1.-uWet*.6);`:'float finishRelief=0.;'}
+      normal=surfaceBump(normal,surfaceRelief+finishRelief,-vViewPosition);`)
+    if(finish==='paint')shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+      roughnessFactor*=mix(mix(.87,.81+.12*noise21(finishUV*1450.),finishFilter),1.,foamCoverage());`)
     shader.fragmentShader=shader.fragmentShader.replace('#include <clearcoat_normal_fragment_maps>',`#include <clearcoat_normal_fragment_maps>
       #ifdef USE_CLEARCOAT
       clearcoatNormal=surfaceBump(clearcoatNormal,surfaceRelief*(1.-foamCoverage()),-vViewPosition);
@@ -116,6 +125,6 @@ export function applySurface(material, uniforms, {foam=true}={}) {
         metalnessFactor*=1.-latherCoverage;`)
     }
   }
-  material.customProgramCacheKey=()=>`aurel-surface-${foam}`
+  material.customProgramCacheKey=()=>`aurel-surface-${foam}-${finish}`
   return material
 }

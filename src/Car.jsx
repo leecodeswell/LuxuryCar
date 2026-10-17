@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { useFrame,useThree } from '@react-three/fiber'
-import { useGLTF, useTexture } from '@react-three/drei'
+import { useFrame,useThree,useLoader } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -9,11 +9,21 @@ import {createWaterRunners,updateWaterRunners} from './water-runners.js'
 import { seededRandom,latherGLSL } from './surface-materials.js'
 import {carTextureFiles,upgradeCarMaterials} from './car-materials.js'
 
-export default function Car({ state,onReady,paintColor }) {
-  const base=import.meta.env.BASE_URL
-  const gltf=useGLTF(`${base}models/ferrari.glb`,`${base}draco/`)
-  const shadow=useTexture(`${base}models/ferrari_ao.png`)
-  const textures=useTexture(carTextureFiles.map(file=>`${base}textures/car/${file}`))
+const base=import.meta.env.BASE_URL,modelUrl=`${base}models/ferrari.glb`,pathsUrl=`${base}models/water-runners.bin`
+const textureUrls=[`${base}models/ferrari_ao.png`,...carTextureFiles.map(file=>`${base}textures/car/${file}`)]
+const binaryLoader=loader=>loader.setResponseType('arraybuffer')
+// Start independent requests together rather than suspending once per hook.
+useGLTF.preload(modelUrl,`${base}draco/`)
+useLoader.preload(THREE.TextureLoader,textureUrls)
+useLoader.preload(THREE.FileLoader,pathsUrl,binaryLoader)
+
+export default function Car({ state,onAssetsReady,paintColor }) {
+  const gltf=useGLTF(modelUrl,`${base}draco/`)
+  // TextureLoader avoids eagerly uploading the unused source copies before
+  // upgradeCarMaterials configures colour space, filtering and cloned maps.
+  const maps=useLoader(THREE.TextureLoader,textureUrls),shadow=maps[0]
+  const textures=useMemo(()=>maps.slice(1),[maps])
+  const paths=useLoader(THREE.FileLoader,pathsUrl,binaryLoader)
   const gl=useThree(s=>s.gl)
   const items=useMemo(()=>{
     const rng=seededRandom(458), model=gltf.scene.clone(true)
@@ -45,7 +55,7 @@ export default function Car({ state,onReady,paintColor }) {
       dummy.position.copy(point).addScaledVector(normal,r*.26);dummy.quaternion.setFromUnitVectors(up,normal);dummy.scale.set(r,r*.5,r);dummy.updateMatrix();drops.setMatrixAt(i,dummy.matrix)
     }
     drops.instanceMatrix.needsUpdate=true
-    const runners=createWaterRunners(body,()=>{sample();return {point:point.clone(),normal:normal.clone()}},rng,dropMaterial.clone())
+    const runners=createWaterRunners(paths,rng,dropMaterial.clone())
     const foamMaterial=new THREE.MeshPhysicalMaterial({color:'#e7edf1',metalness:0,roughness:.8,clearcoat:0,envMapIntensity:.45,transparent:true,opacity:0,alphaTest:.015})
     const foamGeometry=()=>{
       const geometry=new THREE.IcosahedronGeometry(1,0)
@@ -84,9 +94,9 @@ export default function Car({ state,onReady,paintColor }) {
     }
     return {sprayPose:{origin:new THREE.Vector3(),point:new THREE.Vector3(),normal:new THREE.Vector3()},spraySweep:createSpraySweep(body),model,paint,glass,materialSet,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
 
-  },[gltf,textures,gl])
+  },[gltf,textures,gl,paths])
   useEffect(()=>{items.paint.color.set(paintColor)},[items,paintColor])
-  useEffect(()=>{state.current.spraySweep=items.spraySweep;onReady()},[onReady,state,items])
+  useEffect(()=>{state.current.spraySweep=items.spraySweep;onAssetsReady()},[onAssetsReady,state,items])
   useEffect(()=>()=>{
     items.materialSet.dispose()
     for(const mesh of [items.drops,items.froth,items.drips,items.runners.mesh])mesh.geometry.dispose()

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect,useMemo,useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
@@ -7,8 +7,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 
-export default function Effects({ state }) {
+export default function Effects({state,assetsReady,onPrepared,onReady,onPhase,onUnavailable}) {
   const {gl,scene,camera,size}=useThree()
+  const dpr=useThree(s=>s.viewport.dpr)
+  const warmed=useRef(false),presented=useRef(0),ready=useRef(false)
   const pipeline=useMemo(()=>{
     const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:Math.min(4,gl.capabilities.maxSamples)})
     const composer=new EffectComposer(gl,target),render=new RenderPass(scene,camera)
@@ -27,12 +29,28 @@ export default function Effects({ state }) {
     return {composer,bloom,lens}
   },[gl,scene,camera])
   useEffect(()=>{
-    pipeline.composer.setPixelRatio(gl.getPixelRatio());pipeline.composer.setSize(size.width,size.height)
-  },[pipeline,gl,size])
+    pipeline.composer.setPixelRatio(dpr);pipeline.composer.setSize(size.width,size.height)
+  },[pipeline,dpr,size])
   useEffect(()=>()=>{
     pipeline.composer.passes.forEach(pass=>pass.dispose?.());pipeline.composer.dispose()
   },[pipeline])
+  useEffect(()=>{
+    if(!assetsReady)return
+    let cancelled=false
+    onPhase('lighting')
+    const frame=requestAnimationFrame(async()=>{
+      try {
+        // Parallel shader compilation keeps the loading UI responsive on
+        // browsers supporting KHR_parallel_shader_compile.
+        await gl.compileAsync(scene,camera)
+        if(cancelled)return
+        warmed.current=true;onPhase('frame');onPrepared()
+      } catch(error) {if(!cancelled){console.error('Studio preparation failed:',error);onUnavailable()}}
+    })
+    return ()=>{cancelled=true;cancelAnimationFrame(frame)}
+  },[assetsReady,gl,scene,camera,onPrepared,onPhase,onUnavailable])
   useFrame((_,dt)=>{
+    if(!warmed.current)return
     const s=state.current
     gl.toneMappingExposure=THREE.MathUtils.lerp(.95,.78,s.foam)*s.exposure
     pipeline.bloom.strength=.18;pipeline.bloom.threshold=2.4
@@ -40,6 +58,13 @@ export default function Effects({ state }) {
     camera.updateMatrixWorld()
     gl.info.reset()
     pipeline.composer.render(dt)
+    if(!ready.current&&++presented.current>=2){
+      ready.current=true
+      state.current.firstFrame=true
+      performance.mark('aurel:first-frame')
+      // Reveal only after the car has actually rendered, never on asset mount.
+      requestAnimationFrame(onReady)
+    }
   },1)
   return null
 }

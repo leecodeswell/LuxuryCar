@@ -1,10 +1,12 @@
-import { Component, useCallback, useEffect, useRef, useState } from 'react'
-import Scene from './Scene.jsx'
+import { Component, Suspense,lazy,useCallback,useEffect,useRef,useState } from 'react'
+import LoadingScreen from './LoadingScreen.jsx'
 import StoryOverlay from './StoryOverlay.jsx'
 import SiteSections from './SiteSections.jsx'
 import { NAV } from './site-content.js'
 import { storyProgress } from './story-progress.js'
 import { PAINT_COLORS } from './paint-colors.js'
+
+const Scene=lazy(()=>import('./Scene.jsx'))
 
 class RenderBoundary extends Component {
   state = { error: false }
@@ -14,7 +16,7 @@ class RenderBoundary extends Component {
     this.props.onError?.()
   }
   render() {
-    if (this.state.error) return <div className="render-error" role="alert">The studio couldn’t load. Enable WebGL and reload the page.</div>
+    if (this.state.error) return null
     return this.props.children
   }
 }
@@ -23,6 +25,7 @@ export default function App() {
   const [ready, setReady] = useState(false)
   const [paintColor,setPaintColor] = useState(PAINT_COLORS[0].value)
   const [unavailable, setUnavailable] = useState(false)
+  const [loadPhase,setLoadPhase] = useState('assets')
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [storyInView, setStoryInView] = useState(true)
   const [pastStory, setPastStory] = useState(false)
@@ -30,7 +33,9 @@ export default function App() {
   const displayed = useRef(null)
   const story = useRef()
   const markReady = useCallback(() => setReady(true), [])
-  const contextLost = useCallback(event => { event.preventDefault(); setUnavailable(true) }, [])
+  const contextLost = useCallback(event => { event?.preventDefault?.(); setUnavailable(true) }, [])
+
+  useEffect(()=>{document.getElementById('boot-loader')?.remove()},[])
 
   useEffect(() => {
     const update = () => {
@@ -73,15 +78,16 @@ export default function App() {
       <h1 className="visually-hidden">AUREL — luxury car detailing, from inspection to a measured, rinsed, high-gloss finish</h1>
       <section ref={story} className="story" aria-label="The detail, stage by stage">
         <div className="story-track" aria-hidden="true" />
-        <div className={`experience ${ready ? 'is-ready' : ''}`}>
+        <div className={`experience ${ready ? 'is-ready' : ''}`} aria-busy={!ready&&!unavailable}>
           <div className="stage" role="img" aria-label="A live 3D car in a studio: rain, a heavy sprayed foam coating, and progressive body and floor rinses.">
-            <RenderBoundary onError={markReady}>
-              <Scene progress={progress} displayed={displayed} active={storyInView} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} paintColor={paintColor} />
+            <RenderBoundary onError={contextLost}>
+              <Suspense fallback={null}>
+                <Scene progress={progress} displayed={displayed} active={storyInView||!ready} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} onPhase={setLoadPhase} paintColor={paintColor} />
+              </Suspense>
             </RenderBoundary>
           </div>
-          <div className={`loading-screen ${ready ? 'loaded' : ''}`} aria-hidden="true" />
+          <LoadingScreen ready={ready} phase={loadPhase} failed={unavailable}/>
           <StoryOverlay progress={progress} displayed={displayed} reducedMotion={reducedMotion} paintColor={paintColor} onPaintChange={setPaintColor} />
-          {unavailable && <div className="render-error" role="alert">The graphics connection was interrupted. Reload to return to the studio.</div>}
         </div>
       </section>
       <SiteSections />

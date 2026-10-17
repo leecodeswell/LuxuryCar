@@ -7,8 +7,35 @@
     <meta name="description" content="AUREL is a luxury car detailing atelier. Scroll a live 3D studio from first inspection through rain, foam and pressure rinse to a measured high-gloss finish." />
     <title>AUREL — Luxury car detailing atelier</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" href="/models/ferrari.glb" as="fetch" crossorigin />
+    <style>
+      html,body{margin:0;background:#090c0d}
+      #boot-loader{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#090c0d;color:#f3f1ec;text-align:center;font-family:Arial,sans-serif}
+      #boot-loader .loader-content{width:min(420px,calc(100% - 48px))}
+      #boot-loader .loader-orbit{width:64px;height:64px;position:relative;margin:0 auto 36px;display:grid;place-items:center}
+      #boot-loader .loader-ring{position:absolute;inset:-9px;border:1px solid #f2b33d29;border-top-color:#f2b33d;border-right-color:#f2b33d88;border-radius:50%;animation:boot-orbit 1.5s linear infinite}
+      #boot-loader .loader-core{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 24%,#fff2cf,#f2b33d 30%,#71470e 85%);box-shadow:0 0 40px #f2b33d2e}
+      #boot-loader .loader-brand{display:block;font:bold 30px/1 Arial,sans-serif;letter-spacing:.12em}
+      #boot-loader h2{margin:18px 0 10px;font-size:18px;font-weight:500}
+      #boot-loader p{font-size:13px;line-height:1.6;color:#9aa39f}
+      #boot-loader .boot-help{visibility:hidden;margin-top:24px;font-size:11px;animation:boot-help 0s 20s forwards}
+      #boot-loader a{color:#f2b33d;text-underline-offset:4px}
+      @keyframes boot-orbit{to{transform:rotate(360deg)}}
+      @keyframes boot-help{to{visibility:visible}}
+      @media(prefers-reduced-motion:reduce){#boot-loader .loader-ring{animation:none}}
+    </style>
   </head>
   <body>
+    <div id="boot-loader" role="status" aria-live="polite">
+      <div class="loader-content">
+        <div class="loader-orbit" aria-hidden="true"><span class="loader-ring"></span><span class="loader-core"></span></div>
+        <span class="loader-brand">AUREL</span>
+        <h2>Preparing your studio</h2>
+        <p>Loading the car and its finishes.</p>
+        <p class="boot-help">Still waiting? <a href="">Reload the studio</a>.</p>
+      </div>
+    </div>
+    <noscript><style>#boot-loader{display:none}</style><p style="color:#f3f1ec;padding:32px">Enable JavaScript to explore the AUREL studio.</p></noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -48,14 +48,14 @@ function Director({ progress,displayed,reducedMotion,state }) {
   },-1)
   return null
 }
-function Experience({ progress,displayed,reducedMotion,onReady }) {
+function Experience({ progress,displayed,reducedMotion,onReady,paintColor }) {
   const state=useRef({chapter:0,local:0,progress:0,rain:0,precipitation:0,mist:0,weatherReveal:createWeatherReveal(progress.current),foam:0,applied:0,rinse:0,floorRinse:0,rinseSpray:0,spray:0,time:0,gain:1,blackout:0,exposure:1,strobe:0,flash:0,conveyor:0,lighting:createLightingDirector(progress.current)})
   const {scene,camera,gl}=useThree()
   if(import.meta.env.DEV)window.__AUREL_SCENE__={scene,camera,gl,state}
   return <>
     <Suspense fallback={null}>
       <Environments state={state}/>
-      <Car state={state} onReady={onReady}/>
+      <Car state={state} onReady={onReady} paintColor={paintColor}/>
       <HeroTitle state={state} reducedMotion={reducedMotion}/>
       <Rain state={state}/><GroundImpacts state={state}/><Atmosphere state={state}/><SoapSpray state={state}/><SoapSpray state={state} rinse/><SoapSpray state={state} rinse floorSide={1}/><SoapSpray state={state} rinse floorSide={-1}/><GroundLather state={state}/>
       <Spotlights state={state}/>
@@ -64,7 +64,7 @@ function Experience({ progress,displayed,reducedMotion,onReady }) {
     <Effects state={state}/>
   </>
 }
-export default function Scene({progress,displayed,active=true,reducedMotion,onReady,onUnavailable}) {
+export default function Scene({progress,displayed,active=true,reducedMotion,onReady,onUnavailable,paintColor}) {
   // Rendering pauses once the pinned story has scrolled out of view.
   return <Canvas
     frameloop={active?'always':'never'}
@@ -77,5 +77,5 @@ export default function Scene({progress,displayed,active=true,reducedMotion,onRe
       gl.domElement.addEventListener('webglcontextlost',onUnavailable)
     }}
     fallback={<div className="webgl-fallback">Enable WebGL to enter the studio.</div>}
-  ><Experience progress={progress} displayed={displayed} reducedMotion={reducedMotion} onReady={onReady}/></Canvas>
+  ><Experience progress={progress} displayed={displayed} reducedMotion={reducedMotion} onReady={onReady} paintColor={paintColor}/></Canvas>
 }

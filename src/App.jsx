@@ -4,6 +4,7 @@ import StoryOverlay from './StoryOverlay.jsx'
 import SiteSections from './SiteSections.jsx'
 import { NAV } from './site-content.js'
 import { storyProgress } from './story-progress.js'
+import { PAINT_COLORS } from './paint-colors.js'
 
 class RenderBoundary extends Component {
   state = { error: false }
@@ -20,6 +21,7 @@ class RenderBoundary extends Component {
 
 export default function App() {
   const [ready, setReady] = useState(false)
+  const [paintColor,setPaintColor] = useState(PAINT_COLORS[0].value)
   const [unavailable, setUnavailable] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [storyInView, setStoryInView] = useState(true)
@@ -74,11 +76,11 @@ export default function App() {
         <div className={`experience ${ready ? 'is-ready' : ''}`}>
           <div className="stage" role="img" aria-label="A live 3D car in a studio: rain, a heavy sprayed foam coating, and progressive body and floor rinses.">
             <RenderBoundary onError={markReady}>
-              <Scene progress={progress} displayed={displayed} active={storyInView} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} />
+              <Scene progress={progress} displayed={displayed} active={storyInView} reducedMotion={reducedMotion} onReady={markReady} onUnavailable={contextLost} paintColor={paintColor} />
             </RenderBoundary>
           </div>
           <div className={`loading-screen ${ready ? 'loaded' : ''}`} aria-hidden="true" />
-          <StoryOverlay progress={progress} displayed={displayed} reducedMotion={reducedMotion} />
+          <StoryOverlay progress={progress} displayed={displayed} reducedMotion={reducedMotion} paintColor={paintColor} onPaintChange={setPaintColor} />
           {unavailable && <div className="render-error" role="alert">The graphics connection was interrupted. Reload to return to the studio.</div>}
         </div>
       </section>

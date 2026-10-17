@@ -170,6 +170,34 @@ a { color: inherit; }
 .story-ui:not([data-stage="arrival"]) .scroll-hint { opacity: 0; }
 @keyframes hint { 50% { transform: translateY(6px); opacity: .4; } }
 
+/* Glossy, pocket-sized paint palette in the opening hero. */
+.paint-picker {
+  position: absolute; right: var(--gutter); bottom: clamp(28px, 8svh, 88px);
+  margin: 0; min-width: 0; padding: 12px 14px 10px; border-radius: 24px;
+  border: 1px solid rgba(243,241,236,.16);
+  background: linear-gradient(145deg,rgba(34,43,46,.85),rgba(9,14,16,.94));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08),0 12px 36px rgba(0,0,0,.35);
+  backdrop-filter: blur(16px); pointer-events: auto;
+  transition: opacity .35s,transform .35s,visibility .35s;
+}
+.paint-picker-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 0 4px 6px; }
+.paint-picker-caption > span { font: 400 9px var(--mono); text-transform: uppercase; letter-spacing: .15em; color: var(--muted); }
+.paint-picker-caption output { font: 500 11px var(--sans); color: var(--ink); }
+.paint-swatches { display: flex; gap: 5px; }
+.paint-swatch { position: relative; display: grid; place-items: center; width: 36px; height: 36px; cursor: pointer; }
+.paint-swatch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+.paint-chip {
+  position: relative; width: 27px; height: 27px; border-radius: 50%;
+  background: radial-gradient(ellipse at 30% 20%,rgba(255,255,255,.8),rgba(255,255,255,.15) 24%,transparent 55%),var(--paint);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25),inset 0 -5px 7px rgba(0,0,0,.4),0 3px 7px rgba(0,0,0,.35);
+  transition: transform .25s cubic-bezier(.2,.9,.3,1.4);
+}
+.paint-chip::after { content: ''; position: absolute; inset: -4px; border: 1px solid transparent; border-radius: inherit; transition: border-color .2s; }
+.paint-swatch:hover .paint-chip { transform: translateY(-2px) scale(1.08); }
+.paint-swatch input:checked + .paint-chip::after { border-color: var(--accent); }
+.paint-swatch input:focus-visible + .paint-chip { outline: 2px solid var(--ink); outline-offset: 5px; }
+.story-ui:not([data-stage="arrival"]) .paint-picker { opacity: 0; visibility: hidden; transform: translateY(10px) scale(.97); pointer-events: none; }
+
 /* ---------- Content sections ---------- */
 .site { position: relative; z-index: 1; background: var(--bg); overflow-x: clip; }
 .marquee {
@@ -289,7 +317,7 @@ a { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .loading-screen, .story-ui, .hero-wordmark, .headline, .gauge-fill, .site-nav, .site-header { transition: none; }
+  .loading-screen, .story-ui, .hero-wordmark, .headline, .gauge-fill, .site-nav, .site-header, .paint-picker, .paint-chip, .paint-chip::after { transition: none; }
   .headline { transform: none; }
   .gauge-readout { animation: none; }
   .marquee-track, .scroll-hint::after { animation: none; }

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { STAGES, stageAt, glossAt } from './site-content.js'
 import { storyDistance } from './story-progress.js'
+import PaintPicker from './PaintPicker.jsx'
 
 const pad=n=>String(n+1).padStart(2,'0')
 
 // Persistent story UI. It follows the same damped progress as the camera
 // (displayed), falling back to raw scroll when the renderer is unavailable.
-export default function StoryOverlay({ progress, displayed, reducedMotion }) {
+export default function StoryOverlay({ progress, displayed, reducedMotion,paintColor,onPaintChange }) {
   const [active,setActive]=useState(0)
   const [copyVisible,setCopyVisible]=useState(true)
   const root=useRef(),gloss=useRef()
@@ -56,6 +57,7 @@ export default function StoryOverlay({ progress, displayed, reducedMotion }) {
       </article>)}
     </div>
 
+    <PaintPicker color={paintColor} onChange={onPaintChange} active={active===0}/>
     <div className="hero-wordmark" aria-hidden="true">AUREL</div>
     <div className="scroll-hint" aria-hidden="true">Scroll</div>
   </div>

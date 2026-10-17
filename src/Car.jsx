@@ -9,7 +9,7 @@ import {createWaterRunners,updateWaterRunners} from './water-runners.js'
 import { seededRandom,latherGLSL } from './surface-materials.js'
 import {carTextureFiles,upgradeCarMaterials} from './car-materials.js'
 
-export default function Car({ state,onReady }) {
+export default function Car({ state,onReady,paintColor }) {
   const base=import.meta.env.BASE_URL
   const gltf=useGLTF(`${base}models/ferrari.glb`,`${base}draco/`)
   const shadow=useTexture(`${base}models/ferrari_ao.png`)
@@ -85,6 +85,7 @@ export default function Car({ state,onReady }) {
     return {sprayPose:{origin:new THREE.Vector3(),point:new THREE.Vector3(),normal:new THREE.Vector3()},spraySweep:createSpraySweep(body),model,paint,glass,materialSet,uniforms,drops,dropMaterial,foamMaterial,froth,drips,runners}
 
   },[gltf,textures,gl])
+  useEffect(()=>{items.paint.color.set(paintColor)},[items,paintColor])
   useEffect(()=>{state.current.spraySweep=items.spraySweep;onReady()},[onReady,state,items])
   useEffect(()=>()=>{
     items.materialSet.dispose()
